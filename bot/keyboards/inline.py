@@ -119,10 +119,22 @@ def start_keyboard() -> InlineKeyboardMarkup:
 # ──────────────────────────────────────────────
 
 def download_button(video_id: int) -> InlineKeyboardMarkup:
-    """Attach to video posts in the supergroup."""
+    """Attach to video posts in the supergroup — deep link to bot."""
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="Download", callback_data=f"dl_{video_id}")]
+            [InlineKeyboardButton(
+                text="Download Video",
+                url=f"https://t.me/zonarated_bot?start=dl_{video_id}",
+            )]
+        ]
+    )
+
+
+def video_download_button(url: str) -> InlineKeyboardMarkup:
+    """Button sent to user's private chat to open/download the video URL."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Download Video", url=url)]
         ]
     )
 
@@ -138,6 +150,113 @@ def affiliate_button(url: str) -> InlineKeyboardMarkup:
 
 
 # ──────────────────────────────────────────────
+# Genre management (admin)
+# ──────────────────────────────────────────────
+
+def admin_genre_menu() -> InlineKeyboardMarkup:
+    """Sub-menu for genre/topic management."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="List Genres", callback_data="adm_genre_list")],
+            [InlineKeyboardButton(text="Add Genre", callback_data="adm_genre_add")],
+            [InlineKeyboardButton(text="Remove Genre", callback_data="adm_genre_remove")],
+            [InlineKeyboardButton(text="Set 'All' Topic", callback_data="adm_genre_set_all")],
+            [InlineKeyboardButton(text="< Back", callback_data="adm_main")],
+        ]
+    )
+
+
+def genre_remove_keyboard(genres: list) -> InlineKeyboardMarkup:
+    """List genres as buttons for removal. Each genre is a callback."""
+    rows = []
+    for g in genres:
+        label = f"{'[ALL] ' if g['is_all'] else ''}{g['name']}"
+        rows.append(
+            [InlineKeyboardButton(text=label, callback_data=f"adm_genre_del_{g['topic_id']}")]
+        )
+    rows.append([InlineKeyboardButton(text="< Back", callback_data="adm_genres")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def genre_set_all_keyboard(genres: list) -> InlineKeyboardMarkup:
+    """Pick a genre to mark as the 'All Videos' topic."""
+    rows = []
+    for g in genres:
+        label = f"{'>> ' if g['is_all'] else ''}{g['name']}"
+        rows.append(
+            [InlineKeyboardButton(text=label, callback_data=f"adm_genre_all_{g['topic_id']}")]
+        )
+    rows.append([InlineKeyboardButton(text="< Back", callback_data="adm_genres")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def genre_picker_keyboard(genres: list, selected_ids: list | None = None) -> InlineKeyboardMarkup:
+    """Genre picker for the add-video wizard (multi-select toggle).
+
+    Selected genres are prefixed with >> to indicate selection.
+    """
+    selected_ids = selected_ids or []
+    rows = []
+    for g in genres:
+        if not g["is_all"]:
+            is_sel = g["topic_id"] in selected_ids
+            label = f">> {g['name']}" if is_sel else g["name"]
+            rows.append(
+                [InlineKeyboardButton(text=label, callback_data=f"vid_genre_{g['topic_id']}")]
+            )
+    bottom = []
+    if selected_ids:
+        bottom.append(InlineKeyboardButton(text="Done", callback_data="vid_genre_done"))
+    bottom.append(InlineKeyboardButton(text="Cancel", callback_data="vid_cancel"))
+    rows.append(bottom)
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def thumbnail_preview_keyboard() -> InlineKeyboardMarkup:
+    """Shown after auto-extracting a thumbnail from video URL."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Use This", callback_data="vid_thumb_ok")],
+            [InlineKeyboardButton(text="Change Timestamp", callback_data="vid_thumb_change")],
+            [InlineKeyboardButton(text="Skip Thumbnail", callback_data="vid_thumb_skip")],
+            [InlineKeyboardButton(text="Cancel", callback_data="vid_cancel")],
+        ]
+    )
+
+
+def video_skip_keyboard() -> InlineKeyboardMarkup:
+    """Skip button for optional fields in the video wizard."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Skip", callback_data="vid_skip")],
+            [InlineKeyboardButton(text="Cancel", callback_data="vid_cancel")],
+        ]
+    )
+
+
+def video_confirm_keyboard() -> InlineKeyboardMarkup:
+    """Confirm or cancel the video before posting."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="Confirm & Post", callback_data="vid_confirm"),
+                InlineKeyboardButton(text="Cancel", callback_data="vid_cancel"),
+            ]
+        ]
+    )
+
+
+def download_session_button(session_id: str, affiliate_url: str) -> InlineKeyboardMarkup:
+    """Affiliate link + confirm visited button sent in private chat."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Open Link", url=affiliate_url)],
+            [InlineKeyboardButton(text="Done - Send Video", callback_data=f"aff_done_{session_id}")],
+        ]
+    )
+
+
+# ──────────────────────────────────────────────
 # Admin Panel — Main menu
 # ──────────────────────────────────────────────
 
@@ -148,6 +267,8 @@ def admin_main_menu() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="Statistics", callback_data="adm_stats")],
             [InlineKeyboardButton(text="Settings", callback_data="adm_settings")],
             [InlineKeyboardButton(text="User Management", callback_data="adm_users")],
+            [InlineKeyboardButton(text="Manage Genres", callback_data="adm_genres")],
+            [InlineKeyboardButton(text="Add Video", callback_data="adm_addvideo")],
             [InlineKeyboardButton(text="Broadcast", callback_data="adm_broadcast")],
             [InlineKeyboardButton(text="Close Panel", callback_data="adm_close")],
         ]

@@ -14,15 +14,22 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 
 from bot.db.pool import get_pool
-from bot.db import config_repo, user_repo
+from bot.db import config_repo, user_repo, topic_repo
+import time
+
+from bot.config import settings
 from bot.keyboards.inline import (
     admin_main_menu,
     admin_settings_menu,
     admin_users_menu,
     admin_back_main,
     admin_cancel,
+    admin_genre_menu,
+    genre_remove_keyboard,
+    genre_set_all_keyboard,
+    join_supergroup_keyboard,
 )
-from bot.states import AdminInput
+from bot.states import AdminInput, AdminGenre
 from bot.i18n import t
 
 logger = logging.getLogger(__name__)
@@ -392,7 +399,16 @@ async def on_approve_input(message: types.Message, state: FSMContext) -> None:
         )
         return
 
+    # Set referral count to required so status looks natural
+    ref_required = await config_repo.get_required_referrals(pool)
+    if user["referral_count"] < ref_required:
+        await pool.execute(
+            "UPDATE users SET referral_count = $1, last_updated = NOW() WHERE user_id = $2",
+            ref_required, target_id,
+        )
+
     await user_repo.set_verification_complete(pool, target_id)
+    await user_repo.set_ready_to_join(pool, target_id, True)
     await state.clear()
 
     name = user["first_name"] or user["username"] or str(target_id)
@@ -401,13 +417,25 @@ async def on_approve_input(message: types.Message, state: FSMContext) -> None:
         reply_markup=admin_back_main(),
     )
 
-    # Try to notify the approved user
+    # Generate invite link and notify the approved user
     try:
         target_lang = await user_repo.get_language(pool, target_id) or "id"
         bot: Bot = message.bot
+
+        invite_expiry = await config_repo.get_invite_expiry(pool)
+        invite = await bot.create_chat_invite_link(
+            chat_id=settings.supergroup_id,
+            member_limit=1,
+            expire_date=int(time.time()) + invite_expiry,
+        )
+
         await bot.send_message(
             target_id,
             t(target_lang, "admin_approved_you"),
+            reply_markup=join_supergroup_keyboard(
+                invite.invite_link,
+                t(target_lang, "btn_join_supergroup"),
+            ),
         )
     except Exception:
         logger.warning("Could not notify user %s about approval", target_id)
@@ -469,7 +497,7 @@ async def on_lookup_input(message: types.Message, state: FSMContext) -> None:
         f"Ready to join: {'Ya' if user['ready_to_join'] else 'Tidak'}\n"
         f"Joined SG: {'Ya' if user['joined_supergroup'] else 'Tidak'}\n"
         f"Approved: {'Ya' if user['approved'] else 'Tidak'}\n\n"
-        f"Registered: {user['created_at'].strftime('%Y-%m-%d %H:%M')}\n"
+        f"Registered: {user['join_date'].strftime('%Y-%m-%d %H:%M')}\n"
         f"Last update: {user['last_updated'].strftime('%Y-%m-%d %H:%M')}"
     )
 
@@ -534,3 +562,242 @@ async def on_broadcast_input(message: types.Message, state: FSMContext) -> None:
         f"Total: {len(rows)}",
         reply_markup=admin_back_main(),
     )
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# GENRE / TOPIC MANAGEMENT
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+@router.callback_query(F.data == "adm_genres")
+async def cb_genre_menu(callback: types.CallbackQuery, state: FSMContext) -> None:
+    if not await _is_admin(callback.from_user.id):
+        await callback.answer("Access denied", show_alert=True)
+        return
+
+    await state.clear()
+    pool = await get_pool()
+    topics = await topic_repo.get_all_topics(pool)
+    count = len(topics)
+
+    text = f"<b>Manage Genres</b>\n\nTotal genres: <b>{count}</b>\n\nPilih aksi:"
+    await callback.message.edit_text(text, reply_markup=admin_genre_menu())
+    await callback.answer()
+
+
+# ── List Genres ───────────────────────────────
+
+@router.callback_query(F.data == "adm_genre_list")
+async def cb_genre_list(callback: types.CallbackQuery) -> None:
+    if not await _is_admin(callback.from_user.id):
+        await callback.answer("Access denied", show_alert=True)
+        return
+
+    pool = await get_pool()
+    topics = await topic_repo.get_all_topics(pool)
+
+    if not topics:
+        text = "<b>Genre List</b>\n\nBelum ada genre. Tambahkan terlebih dahulu."
+    else:
+        lines = ["<b>Genre List</b>\n"]
+        for i, t_row in enumerate(topics, 1):
+            all_tag = " [ALL]" if t_row["is_all"] else ""
+            pfx = t_row.get("prefix") or "?"
+            thread_tag = f" (thread: {t_row['thread_id']})" if t_row["thread_id"] else " (no thread)"
+            lines.append(f"{i}. {t_row['name']} [<code>{pfx}</code>]{all_tag}{thread_tag}")
+        text = "\n".join(lines)
+
+    await callback.message.edit_text(text, reply_markup=admin_genre_menu())
+    await callback.answer()
+
+
+# ── Add Genre ─────────────────────────────────
+
+@router.callback_query(F.data == "adm_genre_add")
+async def cb_genre_add_prompt(callback: types.CallbackQuery, state: FSMContext) -> None:
+    if not await _is_admin(callback.from_user.id):
+        await callback.answer("Access denied", show_alert=True)
+        return
+
+    await state.set_state(AdminGenre.waiting_genre_name)
+    await callback.message.edit_text(
+        "<b>Add Genre</b>\n\n"
+        "Kirim nama genre baru (contoh: Action, Romance, Horror).\n\n"
+        "Bot akan otomatis membuat topic baru di ZONA RATED.",
+        reply_markup=admin_cancel(),
+    )
+    await callback.answer()
+
+
+@router.message(AdminGenre.waiting_genre_name)
+async def on_genre_name_input(message: types.Message, state: FSMContext) -> None:
+    if not await _is_admin(message.from_user.id):
+        return
+
+    name = (message.text or "").strip()
+    if not name or len(name) > 100:
+        await message.reply("Nama genre harus 1-100 karakter.")
+        return
+
+    pool = await get_pool()
+
+    # Check if genre already exists
+    existing = await topic_repo.get_topic_by_name(pool, name)
+    if existing:
+        await message.reply(
+            f"Genre '{existing['name']}' sudah ada. Kirim nama lain.",
+        )
+        return
+
+    # Create forum topic in the supergroup
+    bot: Bot = message.bot
+    try:
+        forum_topic = await bot.create_forum_topic(
+            chat_id=settings.supergroup_id,
+            name=name,
+        )
+        thread_id = forum_topic.message_thread_id
+
+        # Close the topic so only admins/bot can post
+        try:
+            await bot.close_forum_topic(
+                chat_id=settings.supergroup_id,
+                message_thread_id=thread_id,
+            )
+        except Exception as e:
+            logger.warning("Could not close topic '%s': %s", name, e)
+
+    except Exception as e:
+        logger.error("Failed to create forum topic '%s': %s", name, e)
+        await message.reply(
+            f"Gagal membuat topic di grup: {e}\n\nCoba lagi.",
+            reply_markup=admin_cancel(),
+        )
+        return
+
+    # Save to DB
+    topic = await topic_repo.create_topic(pool, name, thread_id=thread_id)
+    prefix = topic["prefix"]
+    await state.clear()
+
+    await message.answer(
+        f"Genre <b>{name}</b> berhasil ditambahkan!\n"
+        f"Prefix: <code>{prefix}</code>\n"
+        f"Forum topic created (thread_id: {thread_id})",
+        reply_markup=admin_genre_menu(),
+    )
+
+
+# ── Remove Genre ──────────────────────────────
+
+@router.callback_query(F.data == "adm_genre_remove")
+async def cb_genre_remove_list(callback: types.CallbackQuery) -> None:
+    if not await _is_admin(callback.from_user.id):
+        await callback.answer("Access denied", show_alert=True)
+        return
+
+    pool = await get_pool()
+    topics = await topic_repo.get_all_topics(pool)
+
+    if not topics:
+        await callback.answer("Belum ada genre.", show_alert=True)
+        return
+
+    await callback.message.edit_text(
+        "<b>Remove Genre</b>\n\nPilih genre yang ingin dihapus:",
+        reply_markup=genre_remove_keyboard(topics),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("adm_genre_del_"))
+async def cb_genre_delete(callback: types.CallbackQuery) -> None:
+    if not await _is_admin(callback.from_user.id):
+        await callback.answer("Access denied", show_alert=True)
+        return
+
+    topic_id = int(callback.data.split("_")[-1])
+    pool = await get_pool()
+    topic = await topic_repo.get_topic_by_id(pool, topic_id)
+
+    if not topic:
+        await callback.answer("Genre tidak ditemukan.", show_alert=True)
+        return
+
+    name = topic["name"]
+
+    # Try to delete the forum topic in Telegram
+    if topic["thread_id"]:
+        bot: Bot = callback.bot
+        try:
+            await bot.delete_forum_topic(
+                chat_id=settings.supergroup_id,
+                message_thread_id=topic["thread_id"],
+            )
+        except Exception as e:
+            logger.warning("Could not delete forum topic for '%s': %s", name, e)
+
+    await topic_repo.delete_topic(pool, topic_id)
+
+    # Refresh the list
+    topics = await topic_repo.get_all_topics(pool)
+    if topics:
+        await callback.message.edit_text(
+            f"Genre <b>{name}</b> dihapus!\n\nPilih genre lain untuk dihapus:",
+            reply_markup=genre_remove_keyboard(topics),
+        )
+    else:
+        await callback.message.edit_text(
+            f"Genre <b>{name}</b> dihapus!\n\nSemua genre sudah dihapus.",
+            reply_markup=admin_genre_menu(),
+        )
+    await callback.answer()
+
+
+# ── Set 'All' Topic ──────────────────────────
+
+@router.callback_query(F.data == "adm_genre_set_all")
+async def cb_genre_set_all_list(callback: types.CallbackQuery) -> None:
+    if not await _is_admin(callback.from_user.id):
+        await callback.answer("Access denied", show_alert=True)
+        return
+
+    pool = await get_pool()
+    topics = await topic_repo.get_all_topics(pool)
+
+    if not topics:
+        await callback.answer("Belum ada genre. Tambahkan genre dulu.", show_alert=True)
+        return
+
+    await callback.message.edit_text(
+        "<b>Set 'All' Topic</b>\n\n"
+        "Pilih genre yang akan dijadikan topic 'All Videos'.\n"
+        "Setiap video akan diposting juga ke topic ini.\n\n"
+        "Genre yang sudah menjadi 'All' ditandai >>",
+        reply_markup=genre_set_all_keyboard(topics),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("adm_genre_all_"))
+async def cb_genre_mark_all(callback: types.CallbackQuery) -> None:
+    if not await _is_admin(callback.from_user.id):
+        await callback.answer("Access denied", show_alert=True)
+        return
+
+    topic_id = int(callback.data.split("_")[-1])
+    pool = await get_pool()
+
+    # Clear existing 'All' flag
+    await pool.execute("UPDATE topics SET is_all = FALSE WHERE is_all = TRUE")
+
+    # Set the new one
+    await pool.execute("UPDATE topics SET is_all = TRUE WHERE topic_id = $1", topic_id)
+
+    topic = await topic_repo.get_topic_by_id(pool, topic_id)
+    name = topic["name"] if topic else "?"
+
+    await callback.message.edit_text(
+        f"Topic <b>{name}</b> sekarang menjadi topic 'All Videos'!",
+        reply_markup=admin_genre_menu(),
+    )
+    await callback.answer()

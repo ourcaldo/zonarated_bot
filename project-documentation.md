@@ -2324,10 +2324,24 @@ Good luck with your project! 🚀
 
 ---
 
-**Document Version**: 4.0  
-**Last Updated**: February 21, 2026  
+**Document Version**: 5.0  
+**Last Updated**: February 22, 2026  
 **Author**: Project Planning Session  
 **Status**: Implemented and Running  
+
+**Major Changes in v5.0:**
+- Added complete video content management system with 6-step admin wizard (/addvideo)
+- Bot-managed forum topics per genre with auto-prefix codes (e.g. ACT-4821)
+- Auto-thumbnail extraction from video URLs using ffmpeg
+- ShrinkMe.io URL shortener integration (shorten at add-video time, store in DB)
+- Download deep links replace inline callbacks (t.me/zonarated_bot?start=dl_{id})
+- Download session with affiliate gate (10-minute expiry, UUID sessions)
+- Formatted delivery messages with "Download Video" URL button (no raw URLs exposed)
+- New topics table, video_repo module, thumbnail/shortener utilities
+- Genre management admin sub-menu (list/add/remove/set All)
+- Live supergroup membership check on /status
+- Admin approval now generates one-time invite link
+- 8 new i18n keys for download flow (Indonesian + English)
 
 **Major Changes in v4.0:**
 - All emojis/icons removed from every bot message (clean text-only UI)

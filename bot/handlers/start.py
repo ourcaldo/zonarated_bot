@@ -10,12 +10,13 @@ from aiogram.fsm.context import FSMContext
 
 from bot.config import settings
 from bot.db.pool import get_pool
-from bot.db import config_repo, user_repo, referral_repo
+from bot.db import config_repo, user_repo, referral_repo, video_repo
 from bot.keyboards.inline import (
     language_keyboard,
     welcome_keyboard,
     welcome_auto_keyboard,
     gabung_grup_keyboard,
+    download_session_button,
 )
 from bot.states import UserOnboarding
 from bot.i18n import t
@@ -25,6 +26,73 @@ logger = logging.getLogger(__name__)
 router = Router(name="start")
 
 BOT_USERNAME = "zonarated_bot"
+
+
+# ──────────────────────────────────────────────
+# Download deep link handler
+# ──────────────────────────────────────────────
+
+async def _handle_download_deep_link(
+    message: types.Message, pool, user_id: int, deep_link: str
+) -> None:
+    """Handle /start dl_VIDEOID — download flow via deep link."""
+    try:
+        video_id = int(deep_link.removeprefix("dl_"))
+    except ValueError:
+        await message.answer("Video tidak valid.")
+        return
+
+    bot = message.bot
+
+    # Check if user is registered
+    user = await user_repo.get_user(pool, user_id)
+    lang = (user["language"] if user else None) or "id"
+
+    if not user:
+        await message.answer(t(lang, "dl_not_registered"))
+        return
+
+    # Check if user is verified
+    if not user["verification_complete"]:
+        await message.answer(t(lang, "dl_not_verified"))
+        return
+
+    # Get video
+    video = await video_repo.get_video(pool, video_id)
+    if not video:
+        await message.answer("Video tidak ditemukan.")
+        return
+
+    # Increment views
+    await video_repo.increment_views(pool, video_id)
+
+    # Get affiliate link (per-video override or global)
+    affiliate = video["affiliate_link"]
+    if not affiliate:
+        affiliate = await config_repo.get_affiliate_link(pool)
+
+    if affiliate:
+        # Create a download session
+        session_id = await video_repo.create_download_session(pool, user_id, video_id)
+
+        # Send affiliate gate
+        await message.answer(
+            t(lang, "dl_affiliate_prompt"),
+            reply_markup=download_session_button(session_id, affiliate),
+        )
+    else:
+        # No affiliate link — deliver directly
+        from bot.handlers.video import _deliver_video
+        try:
+            await _deliver_video(bot, user_id, video, lang)
+            session_id = await video_repo.create_download_session(pool, user_id, video_id)
+            await video_repo.mark_affiliate_visited(pool, session_id)
+            await video_repo.mark_video_sent(pool, session_id)
+            await video_repo.increment_downloads(pool, video_id)
+            await video_repo.log_download(pool, user_id, video_id, session_id, False)
+        except Exception as e:
+            logger.warning("Could not deliver video to user %s: %s", user_id, e)
+            await message.answer(t(lang, "dl_error"))
 
 
 async def _send_welcome(message_or_callback, user_id: int, lang: str, pool) -> None:
@@ -57,12 +125,20 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
     username = message.from_user.username
     first_name = message.from_user.first_name
 
+    # ── Parse deep link parameter ──────────────────────
+    args = message.text.split(maxsplit=1)
+    deep_link = args[1] if len(args) > 1 else None
+
+    # ── Download deep link: /start dl_VIDEOID ─────────
+    if deep_link and deep_link.startswith("dl_"):
+        await _handle_download_deep_link(message, pool, user_id, deep_link)
+        return
+
     # ── Parse referral parameter ──────────────────────
     referrer_id: int | None = None
-    args = message.text.split(maxsplit=1)
-    if len(args) > 1 and args[1].startswith("ref_"):
+    if deep_link and deep_link.startswith("ref_"):
         try:
-            referrer_id = int(args[1].removeprefix("ref_"))
+            referrer_id = int(deep_link.removeprefix("ref_"))
         except ValueError:
             referrer_id = None
 

@@ -74,3 +74,8 @@ async def get_welcome_message(pool: asyncpg.Pool) -> str:
         await get_config(pool, "WELCOME_MESSAGE")
         or "Selamat datang di ZONA RATED!"
     )
+
+
+async def get_shrinkme_api_key(pool: asyncpg.Pool) -> str:
+    """Shortcut: get SHRINKME_API_KEY (empty string if not set)."""
+    return await get_config(pool, "SHRINKME_API_KEY") or ""

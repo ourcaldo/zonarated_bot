@@ -44,17 +44,27 @@ async def cmd_status(message: types.Message) -> None:
     lang = user["language"] or "id"
     ref_count = user["referral_count"]
     ref_required = await config_repo.get_required_referrals(pool)
-    joined_sg = user["joined_supergroup"]
     verified = user["verification_complete"]
 
-    ref_status = "OK" if ref_count >= ref_required else "X"
-    sg_status = t(lang, "yes") if joined_sg else t(lang, "no")
+    # Live check: is user actually in the supergroup?
+    from bot.config import settings
+    try:
+        member = await message.bot.get_chat_member(
+            chat_id=settings.supergroup_id, user_id=user_id)
+        in_group = member.status in ("member", "administrator", "creator")
+    except Exception:
+        in_group = user["joined_supergroup"]  # fallback to DB
+
+    # Sync DB if user joined but DB not updated yet
+    if in_group and not user["joined_supergroup"]:
+        await user_repo.set_joined_supergroup(pool, user_id)
+
+    sg_status = t(lang, "yes") if in_group else t(lang, "no")
     ver_status = t(lang, "complete") if verified else t(lang, "incomplete")
 
     text = t(lang, "status_text",
              count=ref_count,
              required=ref_required,
-             ref_status=ref_status,
              sg_status=sg_status,
              ver_status=ver_status,
              ref_link=user["referral_link"])
@@ -137,10 +147,10 @@ async def cb_fb_help(callback: types.CallbackQuery) -> None:
 
 
 # ──────────────────────────────────────────────
-# Fallback: any unrecognized message
+# Fallback: any unrecognized message (private chat only)
 # ──────────────────────────────────────────────
 
-@router.message()
+@router.message(F.chat.type == "private")
 async def fallback(message: types.Message) -> None:
     """Catch-all for messages not matched by other handlers."""
     pool = await get_pool()

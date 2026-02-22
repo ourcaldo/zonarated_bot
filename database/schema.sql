@@ -26,7 +26,8 @@ INSERT INTO config (key, value, description) VALUES
     ('INVITE_EXPIRY_SECONDS', '300',                             'How long a one-time invite link stays valid (seconds)'),
     ('ADMIN_IDS',             '',                                'Comma-separated Telegram user IDs of bot admins'),
     ('AFFILIATE_LINK',        '',                                'Default affiliate link shown before downloads'),
-    ('WELCOME_MESSAGE',       'Selamat datang di ZONA RATED!', 'Welcome message sent when user starts the bot')
+    ('WELCOME_MESSAGE',       'Selamat datang di ZONA RATED!', 'Welcome message sent when user starts the bot'),
+    ('SHRINKME_API_KEY',      '',                                'ShrinkMe.io API key for URL shortening (leave empty to disable)')
 ON CONFLICT (key) DO NOTHING;
 
 
@@ -89,15 +90,34 @@ CREATE INDEX IF NOT EXISTS idx_referrals_referred ON referrals(referred_user_id)
 
 
 -- ===========================================
--- 4. VIDEOS TABLE
+-- 4. TOPICS TABLE
+-- Genre topics (forum threads) in the supergroup
+-- ===========================================
+CREATE TABLE IF NOT EXISTS topics (
+    topic_id    BIGSERIAL    PRIMARY KEY,
+    name        VARCHAR(100) NOT NULL UNIQUE,             -- Genre name (e.g. "Action", "Romance")
+    prefix      VARCHAR(10)  UNIQUE,                      -- Code prefix (e.g. "A", "AC") auto-generated
+    thread_id   BIGINT,                                   -- Telegram forum topic message_thread_id
+    is_all      BOOLEAN      DEFAULT FALSE,               -- Is this the "All Videos" topic?
+    created_at  TIMESTAMPTZ  DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_topics_thread ON topics(thread_id);
+
+
+-- ===========================================
+-- 5. VIDEOS TABLE
 -- Metadata for every video posted in the supergroup
 -- ===========================================
 CREATE TABLE IF NOT EXISTS videos (
     video_id       BIGSERIAL    PRIMARY KEY,
+    code           VARCHAR(20)  UNIQUE,                           -- Unique search code e.g. A-2943, AC-2949
     title          VARCHAR(255) NOT NULL,
     category       VARCHAR(100),
     description    TEXT,
     file_url       TEXT         NOT NULL,                         -- Direct URL or Telegram file_id
+    shortened_url  TEXT,                                          -- Shortened URL via ShrinkMe.io (nullable, generated at post time)
+    thumbnail_file_id TEXT,                                       -- Telegram file_id for thumbnail photo (nullable)
     affiliate_link TEXT,                                          -- Per-video affiliate override (nullable, falls back to global)
     topic_id       BIGINT,                                       -- Telegram forum topic ID
     message_id     BIGINT,                                       -- Telegram message ID in the supergroup
@@ -111,7 +131,7 @@ CREATE INDEX IF NOT EXISTS idx_videos_topic    ON videos(topic_id);
 
 
 -- ===========================================
--- 5. DOWNLOAD SESSIONS TABLE
+-- 6. DOWNLOAD SESSIONS TABLE
 -- Tracks each download attempt lifecycle:
 -- button click → affiliate visit → video delivered
 -- ===========================================
@@ -134,7 +154,7 @@ CREATE INDEX IF NOT EXISTS idx_ds_expires   ON download_sessions(expires_at);
 
 
 -- ===========================================
--- 6. DOWNLOADS TABLE
+-- 7. DOWNLOADS TABLE
 -- Permanent log of completed downloads (analytics)
 -- ===========================================
 CREATE TABLE IF NOT EXISTS downloads (
@@ -158,7 +178,7 @@ CREATE INDEX IF NOT EXISTS idx_dl_session ON downloads(session_id);
 
 
 -- ===========================================
--- 7. INVITE LINKS TABLE
+-- 8. INVITE LINKS TABLE
 -- Tracks one-time invite links generated for
 -- verified users (Method 3 audit trail)
 -- ===========================================

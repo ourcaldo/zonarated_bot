@@ -15,6 +15,25 @@ class AdminInput(StatesGroup):
     waiting_broadcast = State()
 
 
+class AdminGenre(StatesGroup):
+    """States for genre management flows."""
+
+    waiting_genre_name = State()
+
+
+class AdminVideo(StatesGroup):
+    """States for the add-video wizard."""
+
+    waiting_title = State()
+    waiting_genre = State()          # callback: genre picker
+    waiting_description = State()
+    waiting_file = State()           # video file or URL
+    waiting_thumbnail = State()      # thumbnail preview / change / upload
+    waiting_thumb_ts = State()       # admin types new timestamp
+    waiting_affiliate = State()      # optional per-video affiliate
+    confirming = State()             # preview + confirm / cancel
+
+
 class UserOnboarding(StatesGroup):
     """States for user onboarding flow."""
 

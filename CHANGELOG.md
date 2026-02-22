@@ -4,6 +4,42 @@ All notable changes to the ZONA RATED Bot project are documented here.
 
 ---
 
+## [v5.0] - 2026-02-22
+
+### Added
+- **Video content management wizard** (`bot/handlers/video.py`): 6-step admin wizard triggered by `/addvideo` or the admin panel. Steps: title -> multi-genre select -> description -> file (Telegram upload or HTTP URL) -> thumbnail preview -> per-video affiliate override -> confirm & post. Wizard uses `AdminVideo` FSM states.
+- **Bot-managed forum topics** (`bot/db/topic_repo.py`): Genres are now Telegram forum topics created/deleted by the bot. Each genre gets an auto-generated unique prefix (e.g. `A`, `AC`, `ACT`) used for video codes. Includes an "All Videos" topic that receives every post.
+- **Genre admin panel**: New "Manage Genres" sub-menu in `/admin` with List, Add, Remove, and Set 'All' operations. Adding a genre creates a closed forum topic in the supergroup. Removing deletes both the Telegram topic and DB record.
+- **Auto-thumbnail extraction** (`bot/utils/thumbnail.py`): For URL-based videos, ffmpeg extracts a JPEG frame (default: 1 second in). Admin can accept, change timestamp, upload custom photo, or skip. Thumbnails are sent as photos in topic posts and delivery messages.
+- **ShrinkMe.io URL shortener** (`bot/utils/shortener.py`): URLs are automatically shortened at add-video time via the ShrinkMe.io API. Shortened URLs stored in `videos.shortened_url` column. Falls back to raw URL if API is unavailable. API key stored in config table (`SHRINKME_API_KEY`).
+- **Download deep link system**: Download buttons in topic posts now use `t.me/zonarated_bot?start=dl_{video_id}` deep links instead of inline callbacks. The `/start` handler routes `dl_` prefixed args to `_handle_download_deep_link()` which validates registration, checks verification, handles affiliate gating, and delivers the video in private chat.
+- **Video code system**: Each video gets a unique code like `ACT-4821` based on its genre prefix + random 4-digit number. Codes are displayed in topic posts and delivery messages.
+- **Download session & affiliate gate**: `video_repo.create_download_session()` creates a 10-minute session with UUID. User sees "Open Link" (affiliate URL) + "Done - Send Video" button. On done, session is validated and video is delivered.
+- **Video delivery formatting**: Private chat delivery shows formatted caption (title, code, description, genre) with a "Download Video" URL button (using shortened URL when available). Thumbnail photo is included if available.
+- **Video repository** (`bot/db/video_repo.py`): Full CRUD + helpers: `create_video`, `get_video`, `get_video_by_code`, `set_message_id`, `set_thumbnail_file_id`, `set_shortened_url`, `increment_views`, `increment_downloads`, `create_download_session`, `get_download_session`, `mark_affiliate_visited`, `mark_video_sent`, `get_active_session`, `log_download`, `get_download_stats`, `generate_video_code`.
+- **New `topics` table**: `topic_id`, `name`, `prefix`, `thread_id`, `is_all`, `created_at` with unique constraints on name and prefix.
+- **New video columns**: `code VARCHAR(20) UNIQUE`, `shortened_url TEXT`, `thumbnail_file_id TEXT` added to videos table.
+- **New config row**: `SHRINKME_API_KEY` seeded in config table.
+- **New FSM states**: `AdminGenre` (`waiting_genre_name`), `AdminVideo` (`waiting_title`, `waiting_genre`, `waiting_description`, `waiting_file`, `waiting_thumbnail`, `waiting_thumb_ts`, `waiting_affiliate`, `confirming`).
+- **New i18n keys**: `dl_not_registered`, `dl_not_verified`, `dl_affiliate_prompt`, `dl_no_affiliate`, `dl_video_sent`, `dl_video_url`, `dl_session_expired`, `dl_error` (both Indonesian and English).
+- **New inline keyboards**: `admin_genre_menu`, `genre_remove_keyboard`, `genre_set_all_keyboard`, `genre_picker_keyboard`, `thumbnail_preview_keyboard`, `video_skip_keyboard`, `video_confirm_keyboard`, `download_session_button`, `video_download_button`.
+- **`bot/utils/` package**: New utility module with `__init__.py`, `shortener.py`, `thumbnail.py`.
+
+### Changed
+- **Admin panel**: Added "Manage Genres" and "Add Video" buttons to the main admin menu.
+- **Admin approval flow**: Now also sets `referral_count` to required minimum, calls `set_ready_to_join()`, generates a one-time invite link, and sends it to the approved user with a join button.
+- **`/status` command**: Now performs live `get_chat_member()` check against the supergroup to verify actual membership, syncing DB if user joined but flag was stale.
+- **Fallback handler scoped**: Changed from catching all messages to only private chat messages (`F.chat.type == "private"`) to avoid interfering with supergroup messages.
+- **Download button**: Changed from inline callback (`dl_{video_id}`) to deep link URL (`t.me/zonarated_bot?start=dl_{video_id}`).
+- **`status_text` i18n**: Removed `{ref_status}` placeholder; simplified Indonesian labels.
+- **Router registration**: Video router registered before common router (common is the catch-all fallback).
+
+### Fixed
+- **User lookup `KeyError`**: Changed `user['created_at']` to `user['join_date']` to match actual DB column name.
+- **Supergroup membership detection**: `/status` now reflects real membership state instead of potentially stale DB flag.
+
+---
+
 ## [v4.0] - 2026-02-21
 
 ### Added

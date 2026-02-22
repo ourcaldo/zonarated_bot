@@ -214,15 +214,15 @@ _STRINGS: dict[str, dict[str, str]] = {
     "status_text": {
         "id": (
             "Status Kamu:\n\n"
-            "Referral: {count}/{required} [{ref_status}]\n"
-            "Join Bot: Done\n"
-            "Joined ZONA RATED: {sg_status}\n"
+            "Referral: {count}/{required}\n"
+            "Join Bot: Sudah\n"
+            "Bergabung ZONA RATED: {sg_status}\n"
             "Verifikasi: {ver_status}\n\n"
             "Link referral kamu:\n<code>{ref_link}</code>"
         ),
         "en": (
             "Your Status:\n\n"
-            "Referrals: {count}/{required} [{ref_status}]\n"
+            "Referrals: {count}/{required}\n"
             "Bot joined: Done\n"
             "Joined ZONA RATED: {sg_status}\n"
             "Verification: {ver_status}\n\n"
@@ -281,6 +281,52 @@ _STRINGS: dict[str, dict[str, str]] = {
     "done": {"id": "Selesai", "en": "Done"},
     "complete": {"id": "Lengkap", "en": "Complete"},
     "incomplete": {"id": "Belum", "en": "Incomplete"},
+
+    # ── Download flow ─────────────────────────────
+    "dl_not_registered": {
+        "id": "Kamu belum terdaftar. Kirim /start ke @zonarated_bot dulu.",
+        "en": "You are not registered. Send /start to @zonarated_bot first.",
+    },
+    "dl_not_verified": {
+        "id": (
+            "Kamu belum memenuhi syarat untuk download.\n\n"
+            "Selesaikan verifikasi terlebih dahulu di @zonarated_bot."
+        ),
+        "en": (
+            "You have not met the requirements to download.\n\n"
+            "Complete verification first at @zonarated_bot."
+        ),
+    },
+    "dl_affiliate_prompt": {
+        "id": (
+            "Untuk mendownload video ini, kunjungi link berikut terlebih dahulu.\n\n"
+            "Setelah selesai, tekan tombol 'Selesai - Kirim Video'."
+        ),
+        "en": (
+            "To download this video, visit the following link first.\n\n"
+            "After visiting, press 'Done - Send Video'."
+        ),
+    },
+    "dl_no_affiliate": {
+        "id": "Memproses download...",
+        "en": "Processing download...",
+    },
+    "dl_video_sent": {
+        "id": "Berikut video yang kamu minta:",
+        "en": "Here is the video you requested:",
+    },
+    "dl_video_url": {
+        "id": "Berikut link video yang kamu minta:\n\n{url}",
+        "en": "Here is the video link you requested:\n\n{url}",
+    },
+    "dl_session_expired": {
+        "id": "Sesi download sudah expired. Klik tombol Download lagi di grup.",
+        "en": "Download session expired. Click the Download button again in the group.",
+    },
+    "dl_error": {
+        "id": "Terjadi kesalahan. Coba lagi nanti.",
+        "en": "An error occurred. Try again later.",
+    },
 }
 
 
