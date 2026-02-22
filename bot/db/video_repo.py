@@ -192,6 +192,14 @@ async def get_download_session(
     )
 
 
+async def mark_visited(pool: asyncpg.Pool, session_id: str) -> None:
+    """Mark that the user has physically visited the redirect link."""
+    await pool.execute(
+        "UPDATE download_sessions SET visited_at = NOW() WHERE session_id = $1",
+        session_id,
+    )
+
+
 async def mark_affiliate_visited(pool: asyncpg.Pool, session_id: str) -> None:
     """Mark that the user has visited the affiliate link."""
     await pool.execute(

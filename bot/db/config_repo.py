@@ -79,3 +79,13 @@ async def get_welcome_message(pool: asyncpg.Pool) -> str:
 async def get_shrinkme_api_key(pool: asyncpg.Pool) -> str:
     """Shortcut: get SHRINKME_API_KEY (empty string if not set)."""
     return await get_config(pool, "SHRINKME_API_KEY") or ""
+
+
+async def get_redirect_base_url(pool: asyncpg.Pool) -> str:
+    """Shortcut: get REDIRECT_BASE_URL (empty string if not set)."""
+    return await get_config(pool, "REDIRECT_BASE_URL") or ""
+
+
+async def get_all_config(pool: asyncpg.Pool) -> list:
+    """Get all config rows ordered by key."""
+    return await pool.fetch("SELECT key, value, description FROM config ORDER BY key")

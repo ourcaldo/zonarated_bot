@@ -299,12 +299,12 @@ _STRINGS: dict[str, dict[str, str]] = {
     },
     "dl_affiliate_prompt": {
         "id": (
-            "Untuk mendownload video ini, kunjungi link berikut terlebih dahulu.\n\n"
-            "Setelah selesai, tekan tombol 'Selesai - Kirim Video'."
+            "Untuk mendownload video ini, buka link berikut.\n\n"
+            "Video akan otomatis dikirim ke chat ini setelah link dibuka."
         ),
         "en": (
-            "To download this video, visit the following link first.\n\n"
-            "After visiting, press 'Done - Send Video'."
+            "To download this video, open the following link.\n\n"
+            "The video will be sent to this chat automatically after you open it."
         ),
     },
     "dl_no_affiliate": {

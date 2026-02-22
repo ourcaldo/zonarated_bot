@@ -75,10 +75,18 @@ async def _handle_download_deep_link(
         # Create a download session
         session_id = await video_repo.create_download_session(pool, user_id, video_id)
 
-        # Send affiliate gate
+        # Build redirect URL using REDIRECT_BASE_URL
+        base_url = await config_repo.get_redirect_base_url(pool)
+        if base_url:
+            redirect_url = f"{base_url.rstrip('/')}/{session_id}"
+        else:
+            # Fallback: direct affiliate link if no redirect base configured
+            redirect_url = affiliate
+
+        # Send affiliate gate with redirect link
         await message.answer(
             t(lang, "dl_affiliate_prompt"),
-            reply_markup=download_session_button(session_id, affiliate),
+            reply_markup=download_session_button(redirect_url),
         )
     else:
         # No affiliate link — deliver directly

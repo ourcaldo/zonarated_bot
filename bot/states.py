@@ -13,6 +13,7 @@ class AdminInput(StatesGroup):
     waiting_approve_id = State()
     waiting_lookup_id = State()
     waiting_broadcast = State()
+    waiting_config_value = State()    # generic config key editor
 
 
 class AdminGenre(StatesGroup):

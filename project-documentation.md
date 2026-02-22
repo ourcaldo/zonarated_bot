@@ -2324,10 +2324,24 @@ Good luck with your project! 🚀
 
 ---
 
-**Document Version**: 5.0  
+**Document Version**: 5.1  
 **Last Updated**: February 22, 2026  
 **Author**: Project Planning Session  
 **Status**: Implemented and Running  
+
+**Major Changes in v5.1:**
+- Added verified redirect tracking server (`bot/web.py`) — embedded aiohttp web server on port 8080
+- Auto-delivery: video is sent to user's Telegram chat when they open the redirect link (no "Done" button)
+- Self-hosted redirect flow: `GET /{session_token}` validates session, marks `visited_at`, delivers video, 302 redirects to affiliate URL
+- `bot/__main__.py` now runs both aiohttp web server and bot polling in the same asyncio loop
+- Added `visited_at TIMESTAMPTZ` column to `download_sessions` for verified visit tracking
+- Added `REDIRECT_BASE_URL` config key for flexible dev/prod URL switching (ngrok or real domain)
+- Dynamic admin config editor: all DB config keys viewable and editable from bot Settings menu
+- Human-readable button labels in admin settings (e.g. "Required Referrals" instead of `REQUIRED_REFERRALS`)
+- New DB helpers: `mark_visited()`, `get_redirect_base_url()`, `get_all_config()`
+- New FSM state: `AdminInput.waiting_config_value` for config editor input
+- Updated `dl_affiliate_prompt` i18n text to describe auto-delivery instead of "Done" button
+- ngrok tunnel integration for development (free static domain)
 
 **Major Changes in v5.0:**
 - Added complete video content management system with 6-step admin wizard (/addvideo)

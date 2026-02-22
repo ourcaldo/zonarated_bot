@@ -4,6 +4,31 @@ All notable changes to the ZONA RATED Bot project are documented here.
 
 ---
 
+## [v5.1] - 2026-02-22
+
+### Added
+- **Verified redirect tracking server** (`bot/web.py`): Embedded aiohttp web server running alongside the bot on port 8080. Single route `GET /{token}` validates download sessions, marks `visited_at` timestamp, auto-delivers the video to the user's Telegram chat, and 302-redirects the browser to the affiliate/ShrinkMe URL. Eliminates the honor-system "Done" button.
+- **Auto-delivery on link open**: When a user opens the redirect link, the web server automatically sends the video to their Telegram chat. No manual confirmation needed.
+- **Dynamic admin config editor**: All database config keys are now viewable and editable from the bot's admin panel (Settings menu). Each key shows its current value and can be updated inline. Type `-` to clear a value.
+- **Friendly config labels**: Admin settings buttons display human-readable labels (e.g. "Required Referrals", "Invite Expiry (sec)") instead of raw variable names.
+- **`visited_at` column**: New `TIMESTAMPTZ` column on `download_sessions` table for tracking actual browser visits.
+- **`REDIRECT_BASE_URL` config key**: New config row controlling the redirect server's public URL. Allows switching between ngrok (dev) and a real domain (prod) without code changes.
+- **`mark_visited()` repository function** (`bot/db/video_repo.py`): Sets `visited_at = NOW()` on a download session.
+- **`get_redirect_base_url()` and `get_all_config()`** (`bot/db/config_repo.py`): New DB helpers for the redirect system and dynamic config editor.
+- **`AdminInput.waiting_config_value` FSM state**: Used by the dynamic config editor to capture new values.
+- **ngrok integration**: Development tunnel via ngrok free static domain forwarding to localhost:8080.
+
+### Changed
+- **`bot/__main__.py`**: Now starts both the aiohttp web server (port 8080) and bot polling in the same asyncio event loop. Cleanup includes `runner.cleanup()`.
+- **Download session button** (`bot/keyboards/inline.py`): Simplified to a single "Open Link" button pointing to the redirect URL. Removed the "Done - Send Video" button.
+- **`_handle_download_deep_link`** (`bot/handlers/start.py`): Builds redirect URL as `{REDIRECT_BASE_URL}/{session_id}` when configured. Falls back to direct affiliate URL otherwise.
+- **`dl_affiliate_prompt` i18n text**: Updated to describe auto-delivery flow ("Video will be sent automatically after you open the link") instead of referencing the removed "Done" button.
+- **Admin settings menu** (`bot/handlers/admin.py`): Replaced static settings view with dynamic editor loading all config rows. Each row is an editable button.
+- **`cb_affiliate_done`** (`bot/handlers/video.py`): Retained as legacy fallback for sessions created before the redirect system, with updated comments.
+- **`database/schema.sql`**: Added `visited_at` column to `download_sessions` and `REDIRECT_BASE_URL` seed row to config INSERT.
+
+---
+
 ## [v5.0] - 2026-02-22
 
 ### Added

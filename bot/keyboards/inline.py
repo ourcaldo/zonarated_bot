@@ -246,12 +246,11 @@ def video_confirm_keyboard() -> InlineKeyboardMarkup:
     )
 
 
-def download_session_button(session_id: str, affiliate_url: str) -> InlineKeyboardMarkup:
-    """Affiliate link + confirm visited button sent in private chat."""
+def download_session_button(redirect_url: str) -> InlineKeyboardMarkup:
+    """Single 'Open Link' button pointing to verified redirect URL."""
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="Open Link", url=affiliate_url)],
-            [InlineKeyboardButton(text="Done - Send Video", callback_data=f"aff_done_{session_id}")],
+            [InlineKeyboardButton(text="Open Link", url=redirect_url)],
         ]
     )
 
@@ -279,8 +278,39 @@ def admin_main_menu() -> InlineKeyboardMarkup:
 # Admin Panel — Settings sub-menu
 # ──────────────────────────────────────────────
 
-def admin_settings_menu() -> InlineKeyboardMarkup:
-    """Sub-menu for dynamic config values."""
+# Friendly display names for config keys
+_CONFIG_LABELS: dict[str, str] = {
+    "REQUIRED_REFERRALS": "Required Referrals",
+    "INVITE_EXPIRY_SECONDS": "Invite Expiry (sec)",
+    "ADMIN_IDS": "Admin IDs",
+    "AFFILIATE_LINK": "Affiliate Link",
+    "WELCOME_MESSAGE": "Welcome Message",
+    "SHRINKME_API_KEY": "ShrinkMe API Key",
+    "REDIRECT_BASE_URL": "Redirect Base URL",
+}
+
+
+def admin_settings_menu(config_rows: list | None = None) -> InlineKeyboardMarkup:
+    """Sub-menu showing ALL config keys from the database.
+
+    Each config key gets its own edit button with a friendly label.
+    Falls back to static menu if config_rows not provided.
+    """
+    if config_rows:
+        rows = []
+        for cfg in config_rows:
+            key = cfg["key"]
+            label = _CONFIG_LABELS.get(key, key.replace("_", " ").title())
+            rows.append(
+                [InlineKeyboardButton(
+                    text=label,
+                    callback_data=f"adm_cfg_{key}",
+                )]
+            )
+        rows.append([InlineKeyboardButton(text="< Back", callback_data="adm_main")])
+        return InlineKeyboardMarkup(inline_keyboard=rows)
+
+    # Fallback static menu
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="Required Referrals", callback_data="adm_set_referrals")],

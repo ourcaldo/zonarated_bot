@@ -162,22 +162,19 @@ async def cb_settings_menu(callback: types.CallbackQuery) -> None:
         return
 
     pool = await get_pool()
-    req = await config_repo.get_required_referrals(pool)
-    aff = await config_repo.get_affiliate_link(pool) or "-"
-    expiry = await config_repo.get_invite_expiry(pool)
-    welcome = await config_repo.get_welcome_message(pool)
-    preview = welcome[:60] + ("..." if len(welcome) > 60 else "")
+    config_rows = await config_repo.get_all_config(pool)
 
-    text = (
-        "<b>Settings</b>\n\n"
-        f"Required Referrals: <b>{req}</b>\n"
-        f"Affiliate Link: {aff}\n"
-        f"Welcome: <i>{preview}</i>\n"
-        f"Invite Expiry: <b>{expiry}s</b>\n\n"
-        "Pilih setting yang ingin diubah:"
+    text = "<b>Settings</b>\n\nSemua pengaturan dari database:\n\n"
+    for cfg in config_rows:
+        key = cfg["key"]
+        val = cfg["value"] or "<i>empty</i>"
+        preview = val[:50] + ("..." if len(val) > 50 else "")
+        text += f"<code>{key}</code>\n  {preview}\n\n"
+    text += "Pilih setting yang ingin diubah:"
+
+    await callback.message.edit_text(
+        text, reply_markup=admin_settings_menu(config_rows)
     )
-
-    await callback.message.edit_text(text, reply_markup=admin_settings_menu())
     await callback.answer()
 
 
@@ -340,6 +337,60 @@ async def on_expiry_input(message: types.Message, state: FSMContext) -> None:
     await message.answer(
         f"<b>Invite Expiry</b> diperbarui ke <b>{val} detik</b> "
         f"({val // 60} menit {val % 60} detik)",
+        reply_markup=admin_back_main(),
+    )
+
+
+# ── Generic Config Key Editor ─────────────────
+
+@router.callback_query(F.data.startswith("adm_cfg_"))
+async def cb_config_edit_prompt(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Prompt admin to edit any config key."""
+    if not await _is_admin(callback.from_user.id):
+        await callback.answer("Access denied", show_alert=True)
+        return
+
+    config_key = callback.data[8:]  # strip "adm_cfg_"
+    pool = await get_pool()
+    current_value = await config_repo.get_config(pool, config_key) or ""
+
+    await state.set_state(AdminInput.waiting_config_value)
+    await state.update_data(config_key=config_key)
+
+    preview = current_value[:200] or "<i>empty</i>"
+    await callback.message.edit_text(
+        f"<b>Edit: {config_key}</b>\n\n"
+        f"Nilai saat ini:\n<code>{preview}</code>\n\n"
+        "Kirim nilai baru, atau kirim <code>-</code> untuk mengosongkan.",
+        reply_markup=admin_cancel(),
+    )
+    await callback.answer()
+
+
+@router.message(AdminInput.waiting_config_value)
+async def on_config_value_input(message: types.Message, state: FSMContext) -> None:
+    """Save a new value for any config key."""
+    if not await _is_admin(message.from_user.id):
+        return
+
+    data = await state.get_data()
+    config_key = data.get("config_key")
+    if not config_key:
+        await state.clear()
+        return
+
+    new_value = (message.text or "").strip()
+    # Dash means clear the value
+    if new_value == "-":
+        new_value = ""
+
+    pool = await get_pool()
+    await config_repo.set_config(pool, config_key, new_value)
+    await state.clear()
+
+    preview = new_value[:100] or "<i>empty</i>"
+    await message.answer(
+        f"<b>{config_key}</b> diperbarui!\n\nNilai baru: <code>{preview}</code>",
         reply_markup=admin_back_main(),
     )
 

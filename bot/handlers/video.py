@@ -665,15 +665,19 @@ async def _post_to_topic(
 
 
 # ═══════════════════════════════════════════════
-# DOWNLOAD FLOW (affiliate done callback only —
-# main download now handled via deep link in start.py)
+# DOWNLOAD FLOW
+# Video delivery is now handled automatically by
+# the web server (bot/web.py) when user opens the
+# verified redirect link.  The old "Done" callback
+# is kept only as a fallback for sessions created
+# before the redirect system was deployed.
 # ═══════════════════════════════════════════════
 
-# ── Affiliate done callback ──────────────────
+# ── Legacy affiliate done callback (fallback) ─
 
 @router.callback_query(F.data.startswith("aff_done_"))
 async def cb_affiliate_done(callback: types.CallbackQuery) -> None:
-    """User clicked 'Done - Send Video' after visiting affiliate link."""
+    """Legacy fallback: user clicked 'Done' on old-style sessions."""
     session_id = callback.data[9:]  # strip "aff_done_"
 
     pool = await get_pool()
@@ -687,18 +691,15 @@ async def cb_affiliate_done(callback: types.CallbackQuery) -> None:
         await callback.answer(t(lang, "dl_session_expired"), show_alert=True)
         return
 
-    # Check session belongs to this user
     if session["user_id"] != user_id:
         await callback.answer("Session invalid.", show_alert=True)
         return
 
-    # Check expiry
     from datetime import datetime, timezone
     if session["expires_at"] and session["expires_at"].replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
         await callback.answer(t(lang, "dl_session_expired"), show_alert=True)
         return
 
-    # Check if video already sent
     if session["video_sent"]:
         await callback.answer("Video sudah dikirim sebelumnya.", show_alert=True)
         return
@@ -712,22 +713,14 @@ async def cb_affiliate_done(callback: types.CallbackQuery) -> None:
 
     bot: Bot = callback.bot
 
-    # Mark affiliate as visited
     await video_repo.mark_affiliate_visited(pool, session_id)
 
-    # Deliver video
     try:
         await _deliver_video(bot, user_id, video, lang)
-
-        # Update session and stats
         await video_repo.mark_video_sent(pool, session_id)
         await video_repo.increment_downloads(pool, video_id)
         await video_repo.log_download(pool, user_id, video_id, session_id, True)
-
-        # Update the inline message to show completion
-        await callback.message.edit_text(
-            t(lang, "dl_video_sent"),
-        )
+        await callback.message.edit_text(t(lang, "dl_video_sent"))
         await callback.answer()
     except Exception as e:
         logger.error("Failed to deliver video %s to user %s: %s", video_id, user_id, e)

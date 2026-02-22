@@ -27,7 +27,8 @@ INSERT INTO config (key, value, description) VALUES
     ('ADMIN_IDS',             '',                                'Comma-separated Telegram user IDs of bot admins'),
     ('AFFILIATE_LINK',        '',                                'Default affiliate link shown before downloads'),
     ('WELCOME_MESSAGE',       'Selamat datang di ZONA RATED!', 'Welcome message sent when user starts the bot'),
-    ('SHRINKME_API_KEY',      '',                                'ShrinkMe.io API key for URL shortening (leave empty to disable)')
+    ('SHRINKME_API_KEY',      '',                                'ShrinkMe.io API key for URL shortening (leave empty to disable)'),
+    ('REDIRECT_BASE_URL',     '',                                'Base URL for verified redirect links (ngrok/custom domain)')
 ON CONFLICT (key) DO NOTHING;
 
 
@@ -143,6 +144,8 @@ CREATE TABLE IF NOT EXISTS download_sessions (
     video_sent        BOOLEAN      DEFAULT FALSE,                 -- Video URL/file delivered to user
     created_at        TIMESTAMPTZ  DEFAULT NOW(),
     expires_at        TIMESTAMPTZ,                                -- Session expiry for cleanup
+
+    visited_at        TIMESTAMPTZ,                                -- When user actually opened the redirect link
 
     CONSTRAINT fk_ds_user  FOREIGN KEY (user_id)  REFERENCES users(user_id)  ON DELETE CASCADE,
     CONSTRAINT fk_ds_video FOREIGN KEY (video_id) REFERENCES videos(video_id) ON DELETE CASCADE
