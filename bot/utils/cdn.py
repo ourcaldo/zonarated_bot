@@ -24,7 +24,7 @@ def sign_bunny_url(
     file_url: str,
     cdn_hostname: str,
     token_key: str,
-    expiry_seconds: int = 14400,  # 4 hours default
+    expiry_seconds: int = 3600,  # 1 hour default
 ) -> str:
     """Return a signed Bunny CDN URL with an expiration token.
 
