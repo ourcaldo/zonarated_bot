@@ -888,7 +888,7 @@ def get_referral_requirement():
 ```
 ┌─────────────────────────────────────┐
 │  Movie Title (2024)                 │
-│  Genre: Action | Duration: 2h 15m   │
+│  Category: Action | Duration: 2h 15m   │
 ├─────────────────────────────────────┤
 │  [⬇️ Download Now]                  │
 └─────────────────────────────────────┘
@@ -2132,7 +2132,7 @@ def is_suspicious_account(user_id):
 
 **Quality:**
 - Verify video quality before posting
-- Include proper metadata (title, year, genre)
+- Include proper metadata (title, year, category)
 - Test download links before publishing
 - Monitor user feedback on content
 
@@ -2345,14 +2345,14 @@ Good luck with your project! 🚀
 
 **Major Changes in v5.0:**
 - Added complete video content management system with 6-step admin wizard (/addvideo)
-- Bot-managed forum topics per genre with auto-prefix codes (e.g. ACT-4821)
+- Bot-managed forum topics per category with auto-prefix codes (e.g. ACT-4821)
 - Auto-thumbnail extraction from video URLs using ffmpeg
 - ShrinkMe.io URL shortener integration (shorten at add-video time, store in DB)
 - Download deep links replace inline callbacks (t.me/zonarated_bot?start=dl_{id})
 - Download session with affiliate gate (10-minute expiry, UUID sessions)
 - Formatted delivery messages with "Download Video" URL button (no raw URLs exposed)
 - New topics table, video_repo module, thumbnail/shortener utilities
-- Genre management admin sub-menu (list/add/remove/set All)
+- Category management admin sub-menu (list/add/remove/set All)
 - Live supergroup membership check on /status
 - Admin approval now generates one-time invite link
 - 8 new i18n keys for download flow (Indonesian + English)

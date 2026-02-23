@@ -1,4 +1,4 @@
-"""Repository for the `topics` table — genre forum topics."""
+"""Repository for the `topics` table — category forum topics."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ import asyncpg
 # ──────────────────────────────────────────────
 
 async def generate_prefix(pool: asyncpg.Pool, name: str) -> str:
-    """Generate a unique prefix for a genre name.
+    """Generate a unique prefix for a category name.
 
     Logic:
         1. Try the first letter (uppercase): e.g. Asia → A
@@ -49,7 +49,7 @@ async def create_topic(
     thread_id: Optional[int] = None,
     is_all: bool = False,
 ) -> asyncpg.Record:
-    """Insert a new genre topic with auto-generated prefix. Returns the created row."""
+    """Insert a new category topic with auto-generated prefix. Returns the created row."""
     prefix = await generate_prefix(pool, name)
     return await pool.fetchrow(
         """
@@ -72,7 +72,7 @@ async def get_all_topics(pool: asyncpg.Pool) -> list[asyncpg.Record]:
 
 
 async def get_topic_by_name(pool: asyncpg.Pool, name: str) -> Optional[asyncpg.Record]:
-    """Fetch a topic by its genre name (case-insensitive)."""
+    """Fetch a topic by its category name (case-insensitive)."""
     return await pool.fetchrow(
         "SELECT * FROM topics WHERE LOWER(name) = LOWER($1)", name
     )

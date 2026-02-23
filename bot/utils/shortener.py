@@ -19,10 +19,17 @@ async def shorten_url(long_url: str) -> str | None:
     """Shorten a URL using ShrinkMe.io.
 
     Reads the API key from the config table (SHRINKME_API_KEY).
+    Respects the SHRINKME_ENABLED toggle — returns None when disabled.
     Returns the shortened URL, or None if the API call fails
     or no API key is configured.
     """
     pool = await get_pool()
+
+    # Check the enable/disable toggle first
+    if not await config_repo.get_shrinkme_enabled(pool):
+        logger.info("ShrinkMe shortening is disabled, skipping")
+        return None
+
     api_key = await config_repo.get_shrinkme_api_key(pool)
     if not api_key:
         logger.warning("ShrinkMe API key not configured, skipping URL shortening")

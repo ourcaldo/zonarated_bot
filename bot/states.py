@@ -16,17 +16,17 @@ class AdminInput(StatesGroup):
     waiting_config_value = State()    # generic config key editor
 
 
-class AdminGenre(StatesGroup):
-    """States for genre management flows."""
+class AdminCategory(StatesGroup):
+    """States for category management flows."""
 
-    waiting_genre_name = State()
+    waiting_category_name = State()
 
 
 class AdminVideo(StatesGroup):
     """States for the add-video wizard."""
 
     waiting_title = State()
-    waiting_genre = State()          # callback: genre picker
+    waiting_category = State()       # callback: category picker
     waiting_description = State()
     waiting_file = State()           # video file or URL
     waiting_thumbnail = State()      # thumbnail preview / change / upload

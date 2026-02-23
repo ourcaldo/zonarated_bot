@@ -150,63 +150,67 @@ def affiliate_button(url: str) -> InlineKeyboardMarkup:
 
 
 # ──────────────────────────────────────────────
-# Genre management (admin)
+# Category management (admin)
 # ──────────────────────────────────────────────
 
-def admin_genre_menu() -> InlineKeyboardMarkup:
-    """Sub-menu for genre/topic management."""
+def admin_category_menu() -> InlineKeyboardMarkup:
+    """Sub-menu for category/topic management."""
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="List Genres", callback_data="adm_genre_list")],
-            [InlineKeyboardButton(text="Add Genre", callback_data="adm_genre_add")],
-            [InlineKeyboardButton(text="Remove Genre", callback_data="adm_genre_remove")],
-            [InlineKeyboardButton(text="Set 'All' Topic", callback_data="adm_genre_set_all")],
+            [
+                InlineKeyboardButton(text="List", callback_data="adm_cat_list"),
+                InlineKeyboardButton(text="Add", callback_data="adm_cat_add"),
+            ],
+            [
+                InlineKeyboardButton(text="Remove", callback_data="adm_cat_remove"),
+                InlineKeyboardButton(text="Set 'All' Topic", callback_data="adm_cat_set_all"),
+            ],
             [InlineKeyboardButton(text="< Back", callback_data="adm_main")],
         ]
     )
 
 
-def genre_remove_keyboard(genres: list) -> InlineKeyboardMarkup:
-    """List genres as buttons for removal. Each genre is a callback."""
+def category_remove_keyboard(categories: list) -> InlineKeyboardMarkup:
+    """List categories as buttons for removal. Each category is a callback."""
     rows = []
-    for g in genres:
+    for g in categories:
         label = f"{'[ALL] ' if g['is_all'] else ''}{g['name']}"
         rows.append(
-            [InlineKeyboardButton(text=label, callback_data=f"adm_genre_del_{g['topic_id']}")]
+            [InlineKeyboardButton(text=label, callback_data=f"adm_cat_del_{g['topic_id']}")]
         )
-    rows.append([InlineKeyboardButton(text="< Back", callback_data="adm_genres")])
+    rows.append([InlineKeyboardButton(text="< Back", callback_data="adm_categories")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def genre_set_all_keyboard(genres: list) -> InlineKeyboardMarkup:
-    """Pick a genre to mark as the 'All Videos' topic."""
+def category_set_all_keyboard(categories: list) -> InlineKeyboardMarkup:
+    """Pick a category to mark as the 'All Videos' topic."""
     rows = []
-    for g in genres:
+    for g in categories:
         label = f"{'>> ' if g['is_all'] else ''}{g['name']}"
         rows.append(
-            [InlineKeyboardButton(text=label, callback_data=f"adm_genre_all_{g['topic_id']}")]
+            [InlineKeyboardButton(text=label, callback_data=f"adm_cat_all_{g['topic_id']}")]
         )
-    rows.append([InlineKeyboardButton(text="< Back", callback_data="adm_genres")])
+    rows.append([InlineKeyboardButton(text="< Back", callback_data="adm_categories")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def genre_picker_keyboard(genres: list, selected_ids: list | None = None) -> InlineKeyboardMarkup:
-    """Genre picker for the add-video wizard (multi-select toggle).
+def category_picker_keyboard(categories: list, selected_ids: list | None = None) -> InlineKeyboardMarkup:
+    """Category picker for the add-video wizard (multi-select toggle).
 
-    Selected genres are prefixed with >> to indicate selection.
+    Selected categories are prefixed with >> to indicate selection.
     """
     selected_ids = selected_ids or []
     rows = []
-    for g in genres:
+    for g in categories:
         if not g["is_all"]:
             is_sel = g["topic_id"] in selected_ids
             label = f">> {g['name']}" if is_sel else g["name"]
             rows.append(
-                [InlineKeyboardButton(text=label, callback_data=f"vid_genre_{g['topic_id']}")]
+                [InlineKeyboardButton(text=label, callback_data=f"vid_cat_{g['topic_id']}")]
             )
     bottom = []
     if selected_ids:
-        bottom.append(InlineKeyboardButton(text="Done", callback_data="vid_genre_done"))
+        bottom.append(InlineKeyboardButton(text="Done", callback_data="vid_cat_done"))
     bottom.append(InlineKeyboardButton(text="Cancel", callback_data="vid_cancel"))
     rows.append(bottom)
     return InlineKeyboardMarkup(inline_keyboard=rows)
@@ -263,12 +267,18 @@ def admin_main_menu() -> InlineKeyboardMarkup:
     """Top-level admin dashboard."""
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="Statistics", callback_data="adm_stats")],
-            [InlineKeyboardButton(text="Settings", callback_data="adm_settings")],
-            [InlineKeyboardButton(text="User Management", callback_data="adm_users")],
-            [InlineKeyboardButton(text="Manage Genres", callback_data="adm_genres")],
-            [InlineKeyboardButton(text="Add Video", callback_data="adm_addvideo")],
-            [InlineKeyboardButton(text="Broadcast", callback_data="adm_broadcast")],
+            [
+                InlineKeyboardButton(text="Statistics", callback_data="adm_stats"),
+                InlineKeyboardButton(text="Settings", callback_data="adm_settings"),
+            ],
+            [
+                InlineKeyboardButton(text="User Mgmt", callback_data="adm_users"),
+                InlineKeyboardButton(text="Categories", callback_data="adm_categories"),
+            ],
+            [
+                InlineKeyboardButton(text="Add Video", callback_data="adm_addvideo"),
+                InlineKeyboardButton(text="Broadcast", callback_data="adm_broadcast"),
+            ],
             [InlineKeyboardButton(text="Close Panel", callback_data="adm_close")],
         ]
     )
@@ -286,27 +296,44 @@ _CONFIG_LABELS: dict[str, str] = {
     "AFFILIATE_LINK": "Affiliate Link",
     "WELCOME_MESSAGE": "Welcome Message",
     "SHRINKME_API_KEY": "ShrinkMe API Key",
+    "SHRINKME_ENABLED": "ShrinkMe Shortener",
     "REDIRECT_BASE_URL": "Redirect Base URL",
 }
+
+# Keys that should render as ON/OFF toggle buttons instead of text editor
+_TOGGLE_KEYS: set[str] = {"SHRINKME_ENABLED"}
 
 
 def admin_settings_menu(config_rows: list | None = None) -> InlineKeyboardMarkup:
     """Sub-menu showing ALL config keys from the database.
 
     Each config key gets its own edit button with a friendly label.
+    Boolean keys in _TOGGLE_KEYS render as toggle buttons (ON/OFF).
     Falls back to static menu if config_rows not provided.
     """
     if config_rows:
-        rows = []
+        buttons = []
         for cfg in config_rows:
             key = cfg["key"]
             label = _CONFIG_LABELS.get(key, key.replace("_", " ").title())
-            rows.append(
-                [InlineKeyboardButton(
-                    text=label,
-                    callback_data=f"adm_cfg_{key}",
-                )]
-            )
+            if key in _TOGGLE_KEYS:
+                is_on = (cfg["value"] or "").strip().lower() in ("true", "1", "yes")
+                toggle_label = f"{label}: {'ON' if is_on else 'OFF'}"
+                buttons.append(
+                    InlineKeyboardButton(
+                        text=toggle_label,
+                        callback_data=f"adm_toggle_{key}",
+                    )
+                )
+            else:
+                buttons.append(
+                    InlineKeyboardButton(
+                        text=label,
+                        callback_data=f"adm_cfg_{key}",
+                    )
+                )
+        # Arrange in rows of 2
+        rows = [buttons[i:i + 2] for i in range(0, len(buttons), 2)]
         rows.append([InlineKeyboardButton(text="< Back", callback_data="adm_main")])
         return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -330,8 +357,10 @@ def admin_users_menu() -> InlineKeyboardMarkup:
     """Sub-menu for user operations."""
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="Approve User", callback_data="adm_approve")],
-            [InlineKeyboardButton(text="Lookup User", callback_data="adm_lookup")],
+            [
+                InlineKeyboardButton(text="Approve User", callback_data="adm_approve"),
+                InlineKeyboardButton(text="Lookup User", callback_data="adm_lookup"),
+            ],
             [InlineKeyboardButton(text="< Back", callback_data="adm_main")],
         ]
     )

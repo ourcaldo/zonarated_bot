@@ -24,12 +24,12 @@ from bot.keyboards.inline import (
     admin_users_menu,
     admin_back_main,
     admin_cancel,
-    admin_genre_menu,
-    genre_remove_keyboard,
-    genre_set_all_keyboard,
+    admin_category_menu,
+    category_remove_keyboard,
+    category_set_all_keyboard,
     join_supergroup_keyboard,
 )
-from bot.states import AdminInput, AdminGenre
+from bot.states import AdminInput, AdminCategory
 from bot.i18n import t
 
 logger = logging.getLogger(__name__)
@@ -341,6 +341,33 @@ async def on_expiry_input(message: types.Message, state: FSMContext) -> None:
     )
 
 
+# ── Boolean Toggle Handler ─────────────────────
+
+@router.callback_query(F.data.startswith("adm_toggle_"))
+async def cb_config_toggle(callback: types.CallbackQuery) -> None:
+    """Toggle a boolean config key between true/false and refresh settings."""
+    if not await _is_admin(callback.from_user.id):
+        await callback.answer("Access denied", show_alert=True)
+        return
+
+    config_key = callback.data[11:]  # strip "adm_toggle_"
+    pool = await get_pool()
+    current = await config_repo.get_config(pool, config_key) or "false"
+    is_on = current.strip().lower() in ("true", "1", "yes")
+    new_value = "false" if is_on else "true"
+    await config_repo.set_config(pool, config_key, new_value)
+
+    status = "OFF" if is_on else "ON"
+    await callback.answer(f"{config_key} -> {status}", show_alert=False)
+
+    # Refresh settings menu
+    config_rows = await config_repo.get_all_config(pool)
+    await callback.message.edit_text(
+        "<b>Settings</b>\n\nPilih pengaturan yang ingin diubah:",
+        reply_markup=admin_settings_menu(config_rows),
+    )
+
+
 # ── Generic Config Key Editor ─────────────────
 
 @router.callback_query(F.data.startswith("adm_cfg_"))
@@ -616,11 +643,11 @@ async def on_broadcast_input(message: types.Message, state: FSMContext) -> None:
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# GENRE / TOPIC MANAGEMENT
+# CATEGORY / TOPIC MANAGEMENT
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-@router.callback_query(F.data == "adm_genres")
-async def cb_genre_menu(callback: types.CallbackQuery, state: FSMContext) -> None:
+@router.callback_query(F.data == "adm_categories")
+async def cb_category_menu(callback: types.CallbackQuery, state: FSMContext) -> None:
     if not await _is_admin(callback.from_user.id):
         await callback.answer("Access denied", show_alert=True)
         return
@@ -630,15 +657,15 @@ async def cb_genre_menu(callback: types.CallbackQuery, state: FSMContext) -> Non
     topics = await topic_repo.get_all_topics(pool)
     count = len(topics)
 
-    text = f"<b>Manage Genres</b>\n\nTotal genres: <b>{count}</b>\n\nPilih aksi:"
-    await callback.message.edit_text(text, reply_markup=admin_genre_menu())
+    text = f"<b>Manage Categories</b>\n\nTotal categories: <b>{count}</b>\n\nPilih aksi:"
+    await callback.message.edit_text(text, reply_markup=admin_category_menu())
     await callback.answer()
 
 
-# ── List Genres ───────────────────────────────
+# ── List Categories ───────────────────────────
 
-@router.callback_query(F.data == "adm_genre_list")
-async def cb_genre_list(callback: types.CallbackQuery) -> None:
+@router.callback_query(F.data == "adm_cat_list")
+async def cb_category_list(callback: types.CallbackQuery) -> None:
     if not await _is_admin(callback.from_user.id):
         await callback.answer("Access denied", show_alert=True)
         return
@@ -647,9 +674,9 @@ async def cb_genre_list(callback: types.CallbackQuery) -> None:
     topics = await topic_repo.get_all_topics(pool)
 
     if not topics:
-        text = "<b>Genre List</b>\n\nBelum ada genre. Tambahkan terlebih dahulu."
+        text = "<b>Category List</b>\n\nBelum ada category. Tambahkan terlebih dahulu."
     else:
-        lines = ["<b>Genre List</b>\n"]
+        lines = ["<b>Category List</b>\n"]
         for i, t_row in enumerate(topics, 1):
             all_tag = " [ALL]" if t_row["is_all"] else ""
             pfx = t_row.get("prefix") or "?"
@@ -657,45 +684,45 @@ async def cb_genre_list(callback: types.CallbackQuery) -> None:
             lines.append(f"{i}. {t_row['name']} [<code>{pfx}</code>]{all_tag}{thread_tag}")
         text = "\n".join(lines)
 
-    await callback.message.edit_text(text, reply_markup=admin_genre_menu())
+    await callback.message.edit_text(text, reply_markup=admin_category_menu())
     await callback.answer()
 
 
-# ── Add Genre ─────────────────────────────────
+# ── Add Category ──────────────────────────────
 
-@router.callback_query(F.data == "adm_genre_add")
-async def cb_genre_add_prompt(callback: types.CallbackQuery, state: FSMContext) -> None:
+@router.callback_query(F.data == "adm_cat_add")
+async def cb_category_add_prompt(callback: types.CallbackQuery, state: FSMContext) -> None:
     if not await _is_admin(callback.from_user.id):
         await callback.answer("Access denied", show_alert=True)
         return
 
-    await state.set_state(AdminGenre.waiting_genre_name)
+    await state.set_state(AdminCategory.waiting_category_name)
     await callback.message.edit_text(
-        "<b>Add Genre</b>\n\n"
-        "Kirim nama genre baru (contoh: Action, Romance, Horror).\n\n"
+        "<b>Add Category</b>\n\n"
+        "Kirim nama category baru (contoh: Action, Romance, Horror).\n\n"
         "Bot akan otomatis membuat topic baru di ZONA RATED.",
         reply_markup=admin_cancel(),
     )
     await callback.answer()
 
 
-@router.message(AdminGenre.waiting_genre_name)
-async def on_genre_name_input(message: types.Message, state: FSMContext) -> None:
+@router.message(AdminCategory.waiting_category_name)
+async def on_category_name_input(message: types.Message, state: FSMContext) -> None:
     if not await _is_admin(message.from_user.id):
         return
 
     name = (message.text or "").strip()
     if not name or len(name) > 100:
-        await message.reply("Nama genre harus 1-100 karakter.")
+        await message.reply("Nama category harus 1-100 karakter.")
         return
 
     pool = await get_pool()
 
-    # Check if genre already exists
+    # Check if category already exists
     existing = await topic_repo.get_topic_by_name(pool, name)
     if existing:
         await message.reply(
-            f"Genre '{existing['name']}' sudah ada. Kirim nama lain.",
+            f"Category '{existing['name']}' sudah ada. Kirim nama lain.",
         )
         return
 
@@ -731,17 +758,17 @@ async def on_genre_name_input(message: types.Message, state: FSMContext) -> None
     await state.clear()
 
     await message.answer(
-        f"Genre <b>{name}</b> berhasil ditambahkan!\n"
+        f"Category <b>{name}</b> berhasil ditambahkan!\n"
         f"Prefix: <code>{prefix}</code>\n"
         f"Forum topic created (thread_id: {thread_id})",
-        reply_markup=admin_genre_menu(),
+        reply_markup=admin_category_menu(),
     )
 
 
-# ── Remove Genre ──────────────────────────────
+# ── Remove Category ──────────────────────────────
 
-@router.callback_query(F.data == "adm_genre_remove")
-async def cb_genre_remove_list(callback: types.CallbackQuery) -> None:
+@router.callback_query(F.data == "adm_cat_remove")
+async def cb_category_remove_list(callback: types.CallbackQuery) -> None:
     if not await _is_admin(callback.from_user.id):
         await callback.answer("Access denied", show_alert=True)
         return
@@ -750,18 +777,18 @@ async def cb_genre_remove_list(callback: types.CallbackQuery) -> None:
     topics = await topic_repo.get_all_topics(pool)
 
     if not topics:
-        await callback.answer("Belum ada genre.", show_alert=True)
+        await callback.answer("Belum ada category.", show_alert=True)
         return
 
     await callback.message.edit_text(
-        "<b>Remove Genre</b>\n\nPilih genre yang ingin dihapus:",
-        reply_markup=genre_remove_keyboard(topics),
+        "<b>Remove Category</b>\n\nPilih category yang ingin dihapus:",
+        reply_markup=category_remove_keyboard(topics),
     )
     await callback.answer()
 
 
-@router.callback_query(F.data.startswith("adm_genre_del_"))
-async def cb_genre_delete(callback: types.CallbackQuery) -> None:
+@router.callback_query(F.data.startswith("adm_cat_del_"))
+async def cb_category_delete(callback: types.CallbackQuery) -> None:
     if not await _is_admin(callback.from_user.id):
         await callback.answer("Access denied", show_alert=True)
         return
@@ -771,7 +798,7 @@ async def cb_genre_delete(callback: types.CallbackQuery) -> None:
     topic = await topic_repo.get_topic_by_id(pool, topic_id)
 
     if not topic:
-        await callback.answer("Genre tidak ditemukan.", show_alert=True)
+        await callback.answer("Category tidak ditemukan.", show_alert=True)
         return
 
     name = topic["name"]
@@ -793,21 +820,21 @@ async def cb_genre_delete(callback: types.CallbackQuery) -> None:
     topics = await topic_repo.get_all_topics(pool)
     if topics:
         await callback.message.edit_text(
-            f"Genre <b>{name}</b> dihapus!\n\nPilih genre lain untuk dihapus:",
-            reply_markup=genre_remove_keyboard(topics),
+            f"Category <b>{name}</b> dihapus!\n\nPilih category lain untuk dihapus:",
+            reply_markup=category_remove_keyboard(topics),
         )
     else:
         await callback.message.edit_text(
-            f"Genre <b>{name}</b> dihapus!\n\nSemua genre sudah dihapus.",
-            reply_markup=admin_genre_menu(),
+            f"Category <b>{name}</b> dihapus!\n\nSemua category sudah dihapus.",
+            reply_markup=admin_category_menu(),
         )
     await callback.answer()
 
 
-# ── Set 'All' Topic ──────────────────────────
+# ── Set 'All' Topic ──────────────────────────────
 
-@router.callback_query(F.data == "adm_genre_set_all")
-async def cb_genre_set_all_list(callback: types.CallbackQuery) -> None:
+@router.callback_query(F.data == "adm_cat_set_all")
+async def cb_category_set_all_list(callback: types.CallbackQuery) -> None:
     if not await _is_admin(callback.from_user.id):
         await callback.answer("Access denied", show_alert=True)
         return
@@ -816,21 +843,21 @@ async def cb_genre_set_all_list(callback: types.CallbackQuery) -> None:
     topics = await topic_repo.get_all_topics(pool)
 
     if not topics:
-        await callback.answer("Belum ada genre. Tambahkan genre dulu.", show_alert=True)
+        await callback.answer("Belum ada category. Tambahkan category dulu.", show_alert=True)
         return
 
     await callback.message.edit_text(
         "<b>Set 'All' Topic</b>\n\n"
-        "Pilih genre yang akan dijadikan topic 'All Videos'.\n"
+        "Pilih category yang akan dijadikan topic 'All Videos'.\n"
         "Setiap video akan diposting juga ke topic ini.\n\n"
-        "Genre yang sudah menjadi 'All' ditandai >>",
-        reply_markup=genre_set_all_keyboard(topics),
+        "Category yang sudah menjadi 'All' ditandai >>",
+        reply_markup=category_set_all_keyboard(topics),
     )
     await callback.answer()
 
 
-@router.callback_query(F.data.startswith("adm_genre_all_"))
-async def cb_genre_mark_all(callback: types.CallbackQuery) -> None:
+@router.callback_query(F.data.startswith("adm_cat_all_"))
+async def cb_category_mark_all(callback: types.CallbackQuery) -> None:
     if not await _is_admin(callback.from_user.id):
         await callback.answer("Access denied", show_alert=True)
         return
@@ -849,6 +876,6 @@ async def cb_genre_mark_all(callback: types.CallbackQuery) -> None:
 
     await callback.message.edit_text(
         f"Topic <b>{name}</b> sekarang menjadi topic 'All Videos'!",
-        reply_markup=admin_genre_menu(),
+        reply_markup=admin_category_menu(),
     )
     await callback.answer()

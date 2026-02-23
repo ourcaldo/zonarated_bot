@@ -28,6 +28,7 @@ INSERT INTO config (key, value, description) VALUES
     ('AFFILIATE_LINK',        '',                                'Default affiliate link shown before downloads'),
     ('WELCOME_MESSAGE',       'Selamat datang di ZONA RATED!', 'Welcome message sent when user starts the bot'),
     ('SHRINKME_API_KEY',      '',                                'ShrinkMe.io API key for URL shortening (leave empty to disable)'),
+    ('SHRINKME_ENABLED',      'true',                            'Enable/disable ShrinkMe URL shortening (true/false)'),
     ('REDIRECT_BASE_URL',     '',                                'Base URL for verified redirect links (ngrok/custom domain)')
 ON CONFLICT (key) DO NOTHING;
 
@@ -92,11 +93,11 @@ CREATE INDEX IF NOT EXISTS idx_referrals_referred ON referrals(referred_user_id)
 
 -- ===========================================
 -- 4. TOPICS TABLE
--- Genre topics (forum threads) in the supergroup
+-- Category topics (forum threads) in the supergroup
 -- ===========================================
 CREATE TABLE IF NOT EXISTS topics (
     topic_id    BIGSERIAL    PRIMARY KEY,
-    name        VARCHAR(100) NOT NULL UNIQUE,             -- Genre name (e.g. "Action", "Romance")
+    name        VARCHAR(100) NOT NULL UNIQUE,             -- Category name (e.g. "Action", "Romance")
     prefix      VARCHAR(10)  UNIQUE,                      -- Code prefix (e.g. "A", "AC") auto-generated
     thread_id   BIGINT,                                   -- Telegram forum topic message_thread_id
     is_all      BOOLEAN      DEFAULT FALSE,               -- Is this the "All Videos" topic?

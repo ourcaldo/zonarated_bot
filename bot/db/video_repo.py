@@ -14,23 +14,23 @@ import asyncpg
 # Video code generation
 # ──────────────────────────────────────────────
 
-async def generate_video_code(pool: asyncpg.Pool, genre_name: str) -> str:
+async def generate_video_code(pool: asyncpg.Pool, category_name: str) -> str:
     """Generate a unique video code like A-2943 or AC-2949.
 
     Format: {prefix}-{4 random digits}
-    The prefix is read from the topics table (stored on genre creation).
-    When category contains multiple genres (comma-separated), uses the first one.
+    The prefix is read from the topics table (stored on category creation).
+    When category contains multiple categories (comma-separated), uses the first one.
     """
-    # Extract the first genre name if comma-separated
-    first_genre = genre_name.split(",")[0].strip()
+    # Extract the first category name if comma-separated
+    first_category = category_name.split(",")[0].strip()
 
-    # Look up the stored prefix for this genre
+    # Look up the stored prefix for this category
     prefix = await pool.fetchval(
-        "SELECT prefix FROM topics WHERE LOWER(name) = LOWER($1)", first_genre
+        "SELECT prefix FROM topics WHERE LOWER(name) = LOWER($1)", first_category
     )
     if not prefix:
         # Fallback: first letter uppercase
-        prefix = first_genre[0].upper() if first_genre else "X"
+        prefix = first_category[0].upper() if first_category else "X"
 
     for _ in range(100):  # max attempts
         digits = random.randint(1000, 9999)

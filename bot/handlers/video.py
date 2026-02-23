@@ -2,7 +2,7 @@
 
 Admin flow:
     /addvideo  OR  Admin Panel > Add Video
-    → title → genre picker → description → video file/URL
+    → title → category picker → description → video file/URL
     → affiliate (optional) → confirm → posts to supergroup
 
 Download flow:
@@ -24,7 +24,7 @@ from bot.config import settings
 from bot.db.pool import get_pool
 from bot.db import config_repo, user_repo, topic_repo, video_repo
 from bot.keyboards.inline import (
-    genre_picker_keyboard,
+    category_picker_keyboard,
     video_skip_keyboard,
     video_confirm_keyboard,
     download_button,
@@ -121,67 +121,67 @@ async def on_video_title(message: types.Message, state: FSMContext) -> None:
         await message.reply("Judul tidak boleh kosong.")
         return
 
-    await state.update_data(title=title, selected_genres=[])
+    await state.update_data(title=title, selected_categories=[])
 
-    # Show genre picker
+    # Show category picker
     pool = await get_pool()
-    genres = await topic_repo.get_all_topics(pool)
+    categories = await topic_repo.get_all_topics(pool)
 
-    # Filter out genres that are only "All" with no other genres
-    non_all = [g for g in genres if not g["is_all"]]
+    # Filter out categories that are only "All" with no other categories
+    non_all = [g for g in categories if not g["is_all"]]
     if not non_all:
         await message.reply(
-            "Belum ada genre. Tambahkan genre terlebih dahulu via Admin Panel > Manage Genres.\n\n"
+            "Belum ada category. Tambahkan category terlebih dahulu via Admin Panel > Manage Categories.\n\n"
             "Wizard dibatalkan.",
         )
         await state.clear()
         return
 
-    await state.set_state(AdminVideo.waiting_genre)
+    await state.set_state(AdminVideo.waiting_category)
     await message.answer(
-        "<b>Step 2/6: Pilih Genre</b>\n\n"
-        "Tap genre untuk memilih/batal pilih (bisa lebih dari 1).\n"
+        "<b>Step 2/6: Pilih Category</b>\n\n"
+        "Tap category untuk memilih/batal pilih (bisa lebih dari 1).\n"
         "Tekan <b>Done</b> setelah selesai memilih.",
-        reply_markup=genre_picker_keyboard(genres),
+        reply_markup=category_picker_keyboard(categories),
     )
 
 
-# ── Step 2: Genre (multi-select toggle) ───────
+# ── Step 2: Category (multi-select toggle) ───
 
-@router.callback_query(AdminVideo.waiting_genre, F.data == "vid_genre_done")
-async def on_video_genre_done(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Confirm genre selection and move to description step."""
+@router.callback_query(AdminVideo.waiting_category, F.data == "vid_cat_done")
+async def on_video_category_done(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Confirm category selection and move to description step."""
     data = await state.get_data()
-    selected: list = data.get("selected_genres", [])
+    selected: list = data.get("selected_categories", [])
 
     if not selected:
-        await callback.answer("Pilih minimal 1 genre.", show_alert=True)
+        await callback.answer("Pilih minimal 1 category.", show_alert=True)
         return
 
-    # Resolve genre details
+    # Resolve category details
     pool = await get_pool()
-    genres_data = []
-    genre_names = []
+    categories_data = []
+    category_names = []
     for tid in selected:
         topic = await topic_repo.get_topic_by_id(pool, tid)
         if topic:
-            genres_data.append({
+            categories_data.append({
                 "topic_id": topic["topic_id"],
                 "name": topic["name"],
                 "thread_id": topic["thread_id"],
                 "prefix": topic.get("prefix"),
             })
-            genre_names.append(topic["name"])
+            category_names.append(topic["name"])
 
     await state.update_data(
-        genres=genres_data,
-        genre_names=genre_names,
+        categories=categories_data,
+        category_names=category_names,
     )
 
-    names_str = ", ".join(genre_names)
+    names_str = ", ".join(category_names)
     await state.set_state(AdminVideo.waiting_description)
     await callback.message.edit_text(
-        f"Genre: <b>{names_str}</b>\n\n"
+        f"Category: <b>{names_str}</b>\n\n"
         "<b>Step 3/6: Deskripsi</b>\n\n"
         "Kirim deskripsi video (atau klik Skip):",
         reply_markup=video_skip_keyboard(),
@@ -189,12 +189,12 @@ async def on_video_genre_done(callback: types.CallbackQuery, state: FSMContext) 
     await callback.answer()
 
 
-@router.callback_query(AdminVideo.waiting_genre, F.data.startswith("vid_genre_"))
-async def on_video_genre_toggle(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Toggle a genre selection on/off."""
+@router.callback_query(AdminVideo.waiting_category, F.data.startswith("vid_cat_"))
+async def on_video_category_toggle(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Toggle a category selection on/off."""
     topic_id = int(callback.data.split("_")[-1])
     data = await state.get_data()
-    selected: list = data.get("selected_genres", [])
+    selected: list = data.get("selected_categories", [])
 
     # Toggle
     if topic_id in selected:
@@ -202,24 +202,24 @@ async def on_video_genre_toggle(callback: types.CallbackQuery, state: FSMContext
     else:
         selected.append(topic_id)
 
-    await state.update_data(selected_genres=selected)
+    await state.update_data(selected_categories=selected)
 
     # Refresh the keyboard
     pool = await get_pool()
-    genres = await topic_repo.get_all_topics(pool)
+    categories = await topic_repo.get_all_topics(pool)
 
     sel_names = []
-    for g in genres:
+    for g in categories:
         if g["topic_id"] in selected:
             sel_names.append(g["name"])
     sel_text = ", ".join(sel_names) if sel_names else "<i>belum dipilih</i>"
 
     await callback.message.edit_text(
-        "<b>Step 2/6: Pilih Genre</b>\n\n"
+        "<b>Step 2/6: Pilih Category</b>\n\n"
         f"Dipilih: {sel_text}\n\n"
-        "Tap genre untuk memilih/batal pilih.\n"
+        "Tap category untuk memilih/batal pilih.\n"
         "Tekan <b>Done</b> setelah selesai memilih.",
-        reply_markup=genre_picker_keyboard(genres, selected),
+        reply_markup=category_picker_keyboard(categories, selected),
     )
     await callback.answer()
 
@@ -468,8 +468,8 @@ async def _show_video_preview(message: types.Message, state: FSMContext, *, edit
     data = await state.get_data()
 
     title = data.get("title", "-")
-    genre_names = data.get("genre_names", [])
-    genre = ", ".join(genre_names) if genre_names else "-"
+    category_names = data.get("category_names", [])
+    category = ", ".join(category_names) if category_names else "-"
     desc = data.get("description") or "<i>tidak ada</i>"
     file_url = data.get("file_url", "-")
     is_tg = data.get("is_telegram_file", False)
@@ -484,7 +484,7 @@ async def _show_video_preview(message: types.Message, state: FSMContext, *, edit
     text = (
         "<b>Preview Video</b>\n\n"
         f"Title: <b>{title}</b>\n"
-        f"Genre: <b>{genre}</b>\n"
+        f"Category: <b>{category}</b>\n"
         f"Description: {desc}\n"
         f"File: {file_display}\n"
         f"Thumbnail: {has_thumb}\n"
@@ -512,8 +512,8 @@ async def on_video_confirm(callback: types.CallbackQuery, state: FSMContext) -> 
     await state.clear()
 
     title = data["title"]
-    genres_data = data.get("genres", [])
-    genre_names = data.get("genre_names", [])
+    genres_data = data.get("categories", [])
+    genre_names = data.get("category_names", [])
     genre_display = ", ".join(genre_names) if genre_names else "-"
     description = data.get("description")
     file_url = data["file_url"]
@@ -527,8 +527,8 @@ async def on_video_confirm(callback: types.CallbackQuery, state: FSMContext) -> 
     pool = await get_pool()
     bot: Bot = callback.bot
 
-    # Use the first genre name for video code prefix and primary category
-    primary_genre = genre_names[0] if genre_names else "Unknown"
+    # Use the first category name for video code prefix and primary category
+    primary_category = genre_names[0] if genre_names else "Unknown"
 
     # Save video to DB first (without message_id)
     video = await video_repo.create_video(
@@ -542,8 +542,12 @@ async def on_video_confirm(callback: types.CallbackQuery, state: FSMContext) -> 
     vid_id = video["video_id"]
     vid_code = video["code"]
 
-    # Shorten URL if it's an external link (not a Telegram file_id)
-    if not is_telegram_file:
+    # Shorten URL if it's an external link (not a Telegram file_id).
+    # Skip for Bunny CDN URLs — those are signed and shortened at delivery time.
+    from bot.config import settings as _cfg
+    cdn_host = _cfg.bunny_cdn_hostname or ""
+    is_cdn_url = cdn_host and file_url.startswith(cdn_host)
+    if not is_telegram_file and not is_cdn_url:
         short = await shorten_url(file_url)
         if short:
             await video_repo.set_shortened_url(pool, vid_id, short)
@@ -553,11 +557,11 @@ async def on_video_confirm(callback: types.CallbackQuery, state: FSMContext) -> 
     caption_lines.append(f"Code: <code>{vid_code}</code>")
     if description:
         caption_lines.append(f"\n{description}")
-    caption_lines.append(f"\nGenre: {genre_display}")
+    caption_lines.append(f"\nCategory: {genre_display}")
     caption = "\n".join(caption_lines)
 
-    # Post to each selected genre topic
-    genre_results = []
+    # Post to each selected category topic
+    category_results = []
     first_msg_id = None
     first_thread_id = None
     thumb_file_id = None  # Reuse Telegram file_id after first upload
@@ -571,7 +575,7 @@ async def on_video_confirm(callback: types.CallbackQuery, state: FSMContext) -> 
             )
             if fid and not thumb_file_id:
                 thumb_file_id = fid
-            genre_results.append((g["name"], msg_id))
+            category_results.append((g["name"], msg_id))
             if msg_id and first_msg_id is None:
                 first_msg_id = msg_id
                 first_thread_id = thread_id
@@ -588,22 +592,22 @@ async def on_video_confirm(callback: types.CallbackQuery, state: FSMContext) -> 
         if fid and not thumb_file_id:
             thumb_file_id = fid
 
-    # Update video record with the first genre message_id and thumbnail
+    # Update video record with the first category message_id and thumbnail
     if first_msg_id:
         await video_repo.set_message_id(pool, vid_id, first_msg_id, first_thread_id)
     if thumb_file_id:
         await video_repo.set_thumbnail_file_id(pool, vid_id, thumb_file_id)
 
     # Build result text
-    genre_status = "\n".join(
-        f"  {name}: {'OK' if mid else 'GAGAL'}" for name, mid in genre_results
+    category_status = "\n".join(
+        f"  {name}: {'OK' if mid else 'GAGAL'}" for name, mid in category_results
     ) or "  (no topics)"
 
     await callback.message.edit_text(
         f"Video <b>{title}</b> berhasil diposting!\n\n"
         f"Code: <code>{vid_code}</code>\n"
         f"Video ID: {vid_id}\n"
-        f"Genre topics:\n{genre_status}\n"
+        f"Category topics:\n{category_status}\n"
         f"All topic: {'OK' if all_msg_id else ('GAGAL' if all_topic else 'N/A')}",
         reply_markup=admin_back_main(),
     )
@@ -754,7 +758,7 @@ async def _deliver_video(
     if description:
         caption_lines.append(f"\n{description}")
     if category:
-        caption_lines.append(f"\nGenre: {category}")
+        caption_lines.append(f"\nCategory: {category}")
     caption = "\n".join(caption_lines)
 
     # Check if it's a Telegram file_id (no http prefix)
@@ -769,17 +773,20 @@ async def _deliver_video(
         # Build a signed CDN URL when the file lives on Bunny CDN
         from bot.config import settings as _cfg
         from bot.utils.cdn import sign_bunny_url
+        from bot.utils.shortener import shorten_url
 
         if (
             _cfg.bunny_cdn_hostname
             and _cfg.bunny_token_key
             and file_url.startswith(_cfg.bunny_cdn_hostname)
         ):
-            delivery_url = sign_bunny_url(
+            signed_url = sign_bunny_url(
                 file_url,
                 _cfg.bunny_cdn_hostname,
                 _cfg.bunny_token_key,
             )
+            # Shorten the signed URL for monetisation (ShrinkMe ads)
+            delivery_url = await shorten_url(signed_url) or signed_url
         else:
             # Non-CDN URL — use shortened link if available
             delivery_url = video.get("shortened_url") or file_url

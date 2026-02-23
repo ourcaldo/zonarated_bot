@@ -10,8 +10,8 @@ Built with Python, aiogram 3.x, asyncpg, PostgreSQL, and aiohttp.
 
 - **Referral-gated access** -- Users must invite a configurable number of people before they can join the supergroup
 - **Bilingual UI** -- Indonesian and English; users choose on first interaction
-- **Forum-based content organization** -- Genres are Telegram forum topics managed by the bot
-- **Video management wizard** -- Admin 6-step flow: title, genres, description, file, thumbnail, affiliate override, confirm & post
+- **Forum-based content organization** -- Categories are Telegram forum topics managed by the bot
+- **Video management wizard** -- Admin 6-step flow: title, categories, description, file, thumbnail, affiliate override, confirm & post
 - **Auto-thumbnail extraction** -- ffmpeg extracts JPEG frames from video URLs
 - **ShrinkMe.io URL shortening** -- Video download URLs shortened automatically at add-time
 - **Verified redirect tracking** -- Embedded aiohttp web server marks real browser visits and auto-delivers videos
@@ -62,7 +62,7 @@ rated-bot/
       config_repo.py      # Config CRUD
       user_repo.py        # User CRUD
       referral_repo.py    # Referral tracking
-      topic_repo.py       # Genre/topic management
+      topic_repo.py       # Category/topic management
       video_repo.py       # Video CRUD + download sessions
     handlers/
       __init__.py         # Router registration
@@ -301,7 +301,7 @@ curl -I https://yourdomain.com/test-token
 1. Add the bot to your supergroup as an **administrator** with permissions: manage topics, invite users via link, delete messages, ban users
 2. Enable **forum/topics mode** in the supergroup settings
 3. Use `/admin` in a private chat with the bot to:
-   - Add genres (creates forum topics automatically)
+   - Add categories (creates forum topics automatically)
    - Set the "All Videos" topic
    - Add videos via the wizard
    - Adjust referral requirements and other settings
@@ -348,7 +348,7 @@ All admin commands are available via `/admin` in a private chat with the bot (re
 | **Settings**        | View/edit all config keys (referrals, affiliate, welcome, etc) |
 | **User Management** | Approve user by ID, look up user details                       |
 | **Broadcast**       | Send HTML message to all users                                 |
-| **Manage Genres**   | List, add, remove genres; set "All Videos" topic               |
+| **Manage Categories**   | List, add, remove categories; set "All Videos" topic               |
 | **Add Video**       | Launch the 6-step video upload wizard                          |
 
 ---

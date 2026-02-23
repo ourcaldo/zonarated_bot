@@ -81,6 +81,14 @@ async def get_shrinkme_api_key(pool: asyncpg.Pool) -> str:
     return await get_config(pool, "SHRINKME_API_KEY") or ""
 
 
+async def get_shrinkme_enabled(pool: asyncpg.Pool) -> bool:
+    """Shortcut: check if ShrinkMe URL shortening is enabled (default True)."""
+    val = await get_config(pool, "SHRINKME_ENABLED")
+    if val is None:
+        return True
+    return val.strip().lower() in ("true", "1", "yes")
+
+
 async def get_redirect_base_url(pool: asyncpg.Pool) -> str:
     """Shortcut: get REDIRECT_BASE_URL (empty string if not set)."""
     return await get_config(pool, "REDIRECT_BASE_URL") or ""
