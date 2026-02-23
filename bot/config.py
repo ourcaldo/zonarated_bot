@@ -33,3 +33,6 @@ settings = Settings(
     supergroup_id=int(_require("SUPERGROUP_ID")),
     database_url=_require("DATABASE_URL"),
 )
+
+# Resolved at startup via bot.get_me(); used for deep-link URLs.
+bot_username: str = ""

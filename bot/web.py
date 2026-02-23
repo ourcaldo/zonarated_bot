@@ -101,6 +101,8 @@ async def handle_redirect(request: web.Request) -> web.Response:
             logger.info("Auto-delivered video %s to user %s via redirect", video_id, user_id)
         except Exception as e:
             logger.error("Failed to auto-deliver video %s to user %s: %s", video_id, user_id, e)
+    else:
+        logger.warning("Bot instance not set, skipping video delivery for session %s", token)
 
     # Determine redirect target — affiliate/ShrinkMe URL
     redirect_url = video.get("affiliate_link")

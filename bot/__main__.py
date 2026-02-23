@@ -11,6 +11,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
+import bot.config as bot_config
 from bot.config import settings
 from bot.db.pool import create_pool, close_pool
 from bot.handlers import register_routers
@@ -42,6 +43,11 @@ async def main() -> None:
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
     dp = Dispatcher()
+
+    # Resolve bot username once at startup
+    me = await bot.get_me()
+    bot_config.bot_username = me.username
+    logger.info("Bot username: @%s", me.username)
 
     # Register all routers
     register_routers(dp)

@@ -20,12 +20,11 @@ from bot.keyboards.inline import (
 )
 from bot.states import UserOnboarding
 from bot.i18n import t
+import bot.config as bot_config
 
 logger = logging.getLogger(__name__)
 
 router = Router(name="start")
-
-BOT_USERNAME = "zonarated_bot"
 
 
 # ──────────────────────────────────────────────
@@ -155,7 +154,7 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
             referrer_id = None
 
     # ── Create / update user in DB ────────────────────
-    ref_link = f"https://t.me/{BOT_USERNAME}?start=ref_{user_id}"
+    ref_link = f"https://t.me/{bot_config.bot_username}?start=ref_{user_id}"
     await user_repo.create_user(
         pool,
         user_id=user_id,

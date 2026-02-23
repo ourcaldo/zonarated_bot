@@ -18,8 +18,6 @@ logger = logging.getLogger(__name__)
 
 router = Router(name="join")
 
-BOT_USERNAME = "zonarated_bot"
-
 
 @router.callback_query(lambda c: c.data == "check_req")
 async def handle_check_req(callback: types.CallbackQuery, bot: Bot) -> None:
