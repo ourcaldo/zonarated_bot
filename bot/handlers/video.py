@@ -37,8 +37,16 @@ from bot.states import AdminVideo
 from bot.i18n import t
 from bot.utils.thumbnail import extract_thumbnail
 from bot.utils.shortener import shorten_url
+from bot.utils.cdn import sign_bunny_url
 
 logger = logging.getLogger(__name__)
+
+
+def _maybe_sign(url: str) -> str:
+    """Return a signed URL if it belongs to the configured Bunny CDN."""
+    if settings.bunny_cdn_hostname and settings.bunny_token_key and url.startswith(settings.bunny_cdn_hostname):
+        return sign_bunny_url(url, settings.bunny_cdn_hostname, settings.bunny_token_key)
+    return url
 
 router = Router(name="video")
 
@@ -292,7 +300,7 @@ async def on_video_file(message: types.Message, state: FSMContext) -> None:
 
     # For URL videos, auto-extract thumbnail at 1 second
     await message.answer("Mengekstrak thumbnail dari video...")
-    thumb_data = await extract_thumbnail(file_url, timestamp_seconds=1)
+    thumb_data = await extract_thumbnail(_maybe_sign(file_url), timestamp_seconds=1)
 
     if thumb_data:
         photo = BufferedInputFile(thumb_data, filename="thumbnail.jpg")
@@ -406,7 +414,7 @@ async def on_thumb_timestamp(message: types.Message, state: FSMContext) -> None:
     file_url = data["file_url"]
 
     await message.answer("Mengekstrak thumbnail...")
-    thumb_data = await extract_thumbnail(file_url, timestamp_seconds=ts)
+    thumb_data = await extract_thumbnail(_maybe_sign(file_url), timestamp_seconds=ts)
 
     if thumb_data:
         photo = BufferedInputFile(thumb_data, filename="thumbnail.jpg")
