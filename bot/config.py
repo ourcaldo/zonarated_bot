@@ -26,12 +26,16 @@ class Settings:
     bot_token: str
     supergroup_id: int
     database_url: str
+    bunny_cdn_hostname: str
+    bunny_token_key: str
 
 
 settings = Settings(
     bot_token=_require("BOT_TOKEN"),
     supergroup_id=int(_require("SUPERGROUP_ID")),
     database_url=_require("DATABASE_URL"),
+    bunny_cdn_hostname=os.getenv("BUNNY_CDN_HOSTNAME", ""),
+    bunny_token_key=os.getenv("BUNNY_TOKEN_KEY", ""),
 )
 
 # Resolved at startup via bot.get_me(); used for deep-link URLs.

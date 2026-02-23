@@ -758,8 +758,23 @@ async def _deliver_video(
             caption=caption,
         )
     else:
-        # Use shortened URL if available, otherwise raw URL
-        delivery_url = video.get("shortened_url") or file_url
+        # Build a signed CDN URL when the file lives on Bunny CDN
+        from bot.config import settings as _cfg
+        from bot.utils.cdn import sign_bunny_url
+
+        if (
+            _cfg.bunny_cdn_hostname
+            and _cfg.bunny_token_key
+            and file_url.startswith(_cfg.bunny_cdn_hostname)
+        ):
+            delivery_url = sign_bunny_url(
+                file_url,
+                _cfg.bunny_cdn_hostname,
+                _cfg.bunny_token_key,
+            )
+        else:
+            # Non-CDN URL — use shortened link if available
+            delivery_url = video.get("shortened_url") or file_url
         thumb_fid = video.get("thumbnail_file_id")
 
         if thumb_fid:
