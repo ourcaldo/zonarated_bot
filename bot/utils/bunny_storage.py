@@ -137,9 +137,15 @@ async def _collect_videos_recursive(
                 encoded_path = "/".join(quote(segment, safe="") for segment in file_path.split("/"))
                 cdn_url = f"{cdn_hostname}/{encoded_path}"
 
+                # Title: {parent_folder} - {file_name}
+                parts = path.rstrip("/").split("/")
+                parent_folder = _title_from_filename(parts[-1]) if parts else ""
+                file_title = _title_from_filename(name)
+                title = f"{parent_folder} - {file_title}" if parent_folder else file_title
+
                 results.append({
                     "url": cdn_url,
-                    "title": _title_from_filename(name),
+                    "title": title,
                     "path": file_path,
                     "filename": name,
                 })
