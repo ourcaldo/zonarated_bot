@@ -1292,7 +1292,7 @@ async def _autorun_scan_and_confirm(
     callback: types.CallbackQuery, state: FSMContext, delay_minutes: int
 ) -> None:
     """Scan Bunny Storage and show summary for confirmation."""
-    from bot.utils.bunny_storage import list_category_videos
+    from bot.utils.bunny_storage import list_category_videos, resolve_storage_folder
 
     pool = await get_pool()
     data = await state.get_data()
@@ -1317,8 +1317,13 @@ async def _autorun_scan_and_confirm(
 
     for cat in categories:
         cat_name = cat["name"]
+        # Resolve topic name to actual storage folder name
+        folder_name = await resolve_storage_folder(cat_name)
+        if not folder_name:
+            category_summary.append(f"  {cat_name}: NO MATCHING FOLDER")
+            continue
         try:
-            videos = await list_category_videos(cat_name)
+            videos = await list_category_videos(folder_name)
         except Exception as e:
             logger.warning("Auto Get & Run: failed to scan '%s': %s", cat_name, e)
             category_summary.append(f"  {cat_name}: ERROR ({e})")
@@ -1355,7 +1360,7 @@ async def _autorun_scan_and_confirm_msg(
     message: types.Message, state: FSMContext, delay_minutes: int
 ) -> None:
     """Same as above but triggered from a message context."""
-    from bot.utils.bunny_storage import list_category_videos
+    from bot.utils.bunny_storage import list_category_videos, resolve_storage_folder
 
     pool = await get_pool()
     data = await state.get_data()
@@ -1377,8 +1382,12 @@ async def _autorun_scan_and_confirm_msg(
 
     for cat in categories:
         cat_name = cat["name"]
+        folder_name = await resolve_storage_folder(cat_name)
+        if not folder_name:
+            category_summary.append(f"  {cat_name}: NO MATCHING FOLDER")
+            continue
         try:
-            videos = await list_category_videos(cat_name)
+            videos = await list_category_videos(folder_name)
         except Exception as e:
             logger.warning("Auto Get & Run: failed to scan '%s': %s", cat_name, e)
             category_summary.append(f"  {cat_name}: ERROR ({e})")

@@ -195,3 +195,31 @@ async def list_all_categories() -> list[str]:
         return []
 
     return [obj["ObjectName"] for obj in objects if obj.get("IsDirectory")]
+
+
+async def resolve_storage_folder(topic_name: str) -> str | None:
+    """Match a DB topic name to an actual Bunny Storage folder.
+
+    Topic names may use the format 'Local / English' (e.g. 'Solo / Solo',
+    'Barat / Western').  Storage folders use a single word (e.g. 'Solo',
+    'Western').  This function lists the root folders and returns the first
+    one that matches any segment of the topic name (case-insensitive).
+
+    Returns the exact folder name from storage, or None if no match.
+    """
+    folders = await list_all_categories()
+    if not folders:
+        return None
+
+    # Split topic name on ' / ' and also try the full name
+    candidates = [s.strip() for s in topic_name.split("/")]
+    candidates.append(topic_name.strip())
+
+    folder_lower = {f.lower(): f for f in folders}
+
+    for candidate in candidates:
+        match = folder_lower.get(candidate.lower())
+        if match:
+            return match
+
+    return None

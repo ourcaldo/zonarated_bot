@@ -34,7 +34,7 @@ INSERT INTO config (key, value, description) VALUES
     ('MAINTENANCE_START',     '',                                'Maintenance window start (ISO 8601 datetime, optional)'),
     ('MAINTENANCE_END',       '',                                'Maintenance window end (ISO 8601 datetime, optional)'),
     ('BUNNY_STORAGE_API_KEY', '',                                'Bunny Edge Storage API key for Auto Get & Run'),
-    ('BUNNY_STORAGE_ZONE',    '',                                'Bunny Edge Storage zone name (e.g. zrbot)'),
+    ('BUNNY_STORAGE_ZONE',    '',                                'Bunny Edge Storage zone name (e.g. zbot)'),
     ('BUNNY_STORAGE_REGION',  '',                                'Bunny Edge Storage region (e.g. sg for Singapore, empty for default)')
 ON CONFLICT (key) DO NOTHING;
 
