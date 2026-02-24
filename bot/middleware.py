@@ -22,7 +22,7 @@ from typing import Any, Awaitable, Callable
 from aiogram import BaseMiddleware, types
 
 from bot.db.pool import get_pool
-from bot.db import config_repo
+from bot.db import config_repo, user_repo
 
 logger = logging.getLogger(__name__)
 
@@ -119,20 +119,25 @@ class MaintenanceMiddleware(BaseMiddleware):
             return await handler(event, data)
 
         # Block the user with a maintenance message
+        lang = await user_repo.get_language(pool, user_id) or "id"
         end_dt = _cache.get("end")
         if end_dt:
             end_str = end_dt.strftime("%Y-%m-%d %H:%M UTC")
-            text = (
-                "Bot sedang dalam pemeliharaan.\n"
-                f"Estimasi selesai: {end_str}\n\n"
-                "The bot is currently under maintenance.\n"
-                f"Estimated completion: {end_str}"
-            )
+            if lang == "en":
+                text = (
+                    "The bot is currently under maintenance.\n"
+                    f"Estimated completion: {end_str}"
+                )
+            else:
+                text = (
+                    "Bot sedang dalam pemeliharaan.\n"
+                    f"Estimasi selesai: {end_str}"
+                )
         else:
-            text = (
-                "Bot sedang dalam pemeliharaan. Silakan coba lagi nanti.\n\n"
-                "The bot is currently under maintenance. Please try again later."
-            )
+            if lang == "en":
+                text = "The bot is currently under maintenance. Please try again later."
+            else:
+                text = "Bot sedang dalam pemeliharaan. Silakan coba lagi nanti."
 
         bot = data.get("bot")
         if bot and isinstance(event, types.Message) and event.chat:
