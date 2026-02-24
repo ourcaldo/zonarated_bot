@@ -73,6 +73,7 @@ async def extract_thumbnail(
             "-i", video_url,
             "-frames:v", "1",
             "-q:v", str(quality),
+            "-vf", "scale='min(320,iw)':-2",
             "-update", "1",
             tmp_path,
         ]

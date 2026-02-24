@@ -87,9 +87,19 @@ async def get_video(pool: asyncpg.Pool, video_id: int) -> Optional[asyncpg.Recor
 
 
 async def get_video_by_url(pool: asyncpg.Pool, file_url: str) -> Optional[asyncpg.Record]:
-    """Fetch a video by its file_url (exact match). Used for duplicate detection."""
-    return await pool.fetchrow(
+    """Fetch a video by its file_url. Handles URL-encoding differences (%20 vs space)."""
+    from urllib.parse import unquote
+    # Exact match first (fast path)
+    row = await pool.fetchrow(
         "SELECT * FROM videos WHERE file_url = $1 LIMIT 1", file_url
+    )
+    if row:
+        return row
+    # Fallback: compare with URL-decoded normalization
+    decoded = unquote(file_url).strip()
+    return await pool.fetchrow(
+        "SELECT * FROM videos WHERE replace(file_url, '%20', ' ') = $1 LIMIT 1",
+        decoded,
     )
 
 

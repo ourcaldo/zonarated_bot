@@ -124,7 +124,15 @@ async def _start_video_wizard(message: types.Message, state: FSMContext) -> None
 @router.callback_query(F.data == "vid_cancel")
 async def cb_vid_cancel(callback: types.CallbackQuery, state: FSMContext) -> None:
     await state.clear()
-    await callback.message.edit_text("Video wizard dibatalkan.")
+    try:
+        await callback.message.edit_text("Video wizard dibatalkan.")
+    except Exception:
+        # Message might be a photo (e.g. thumbnail preview) — delete it instead
+        try:
+            await callback.message.delete()
+        except Exception:
+            pass
+        await callback.message.answer("Video wizard dibatalkan.")
     await callback.answer()
 
 
@@ -308,6 +316,8 @@ async def on_video_file(message: types.Message, state: FSMContext) -> None:
 
     # ── Duplicate check ──────────────────────────
     pool = await get_pool()
+
+    # Check posted videos
     existing = await video_repo.get_video_by_url(pool, file_url)
     if existing:
         post_date = existing["post_date"].strftime("%Y-%m-%d %H:%M") if existing["post_date"] else "N/A"
@@ -318,6 +328,23 @@ async def on_video_file(message: types.Message, state: FSMContext) -> None:
             f"Code: <code>{existing['code']}</code>\n"
             f"Category: {existing['category'] or 'N/A'}\n"
             f"Posted: {post_date}\n\n"
+            "Choose an action:",
+            reply_markup=duplicate_video_keyboard(),
+        )
+        return
+
+    # Check scheduled videos queue
+    from bot.db import schedule_repo
+    scheduled = await schedule_repo.get_scheduled_by_url(pool, file_url)
+    if scheduled:
+        sched_time = scheduled["scheduled_at"].strftime("%Y-%m-%d %H:%M") if scheduled["scheduled_at"] else "N/A"
+        await message.answer(
+            "<b>Duplicate Detected</b>\n\n"
+            f"This video is already in the schedule queue:\n\n"
+            f"Title: <b>{scheduled['title']}</b>\n"
+            f"Category: {scheduled['category'] or 'N/A'}\n"
+            f"Scheduled: {sched_time}\n"
+            f"Status: {scheduled['status']}\n\n"
             "Choose an action:",
             reply_markup=duplicate_video_keyboard(),
         )

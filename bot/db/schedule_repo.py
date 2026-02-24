@@ -138,6 +138,25 @@ async def get_scheduled_urls(pool: asyncpg.Pool) -> set[str]:
     return {r["file_url"] for r in rows}
 
 
+async def get_scheduled_by_url(pool: asyncpg.Pool, file_url: str):
+    """Check if a URL already exists in pending/posting scheduled videos.
+
+    Handles URL-encoding differences (%20 vs space).
+    """
+    from urllib.parse import unquote
+    row = await pool.fetchrow(
+        "SELECT * FROM scheduled_videos WHERE file_url = $1 AND status IN ('pending', 'posting') LIMIT 1",
+        file_url,
+    )
+    if row:
+        return row
+    decoded = unquote(file_url).strip()
+    return await pool.fetchrow(
+        "SELECT * FROM scheduled_videos WHERE replace(file_url, '%20', ' ') = $1 AND status IN ('pending', 'posting') LIMIT 1",
+        decoded,
+    )
+
+
 async def get_schedule_by_id(pool: asyncpg.Pool, schedule_id: int) -> Optional[asyncpg.Record]:
     """Fetch a scheduled video by ID."""
     return await pool.fetchrow(
