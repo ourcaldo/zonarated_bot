@@ -137,11 +137,11 @@ async def _collect_videos_recursive(
                 encoded_path = "/".join(quote(segment, safe="") for segment in file_path.split("/"))
                 cdn_url = f"{cdn_hostname}/{encoded_path}"
 
-                # Title: {category_folder} - {file_name}
-                parts = path.rstrip("/").split("/")
-                category_folder = _title_from_filename(parts[0]) if parts else ""
-                file_title = _title_from_filename(name)
-                title = f"{category_folder} - {file_title}" if category_folder else file_title
+                # Title: all path segments + filename joined with " - "
+                # Solo/Manuel Ferrera/Video1.mp4 -> "Solo - Manuel Ferrera - Video1"
+                parts = [_title_from_filename(p) for p in path.rstrip("/").split("/") if p]
+                parts.append(_title_from_filename(name))
+                title = " - ".join(parts)
 
                 results.append({
                     "url": cdn_url,
