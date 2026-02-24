@@ -344,6 +344,7 @@ async def on_expiry_input(message: types.Message, state: FSMContext) -> None:
 # ── Maintenance Mode Toggle (special) ─────────
 
 from bot.keyboards.inline import maintenance_toggle_keyboard
+from bot.middleware import invalidate_maintenance_cache
 
 @router.callback_query(F.data == "adm_toggle_MAINTENANCE_MODE")
 async def cb_maintenance_toggle(callback: types.CallbackQuery, state: FSMContext) -> None:
@@ -361,6 +362,7 @@ async def cb_maintenance_toggle(callback: types.CallbackQuery, state: FSMContext
         await config_repo.set_config(pool, "MAINTENANCE_MODE", "false")
         await config_repo.set_config(pool, "MAINTENANCE_START", "")
         await config_repo.set_config(pool, "MAINTENANCE_END", "")
+        invalidate_maintenance_cache()
         await callback.answer("Maintenance mode OFF", show_alert=False)
         config_rows = await config_repo.get_all_config(pool)
         await callback.message.edit_text(
@@ -389,6 +391,7 @@ async def cb_maint_enable_now(callback: types.CallbackQuery, state: FSMContext) 
     await config_repo.set_config(pool, "MAINTENANCE_MODE", "true")
     await config_repo.set_config(pool, "MAINTENANCE_START", "")
     await config_repo.set_config(pool, "MAINTENANCE_END", "")
+    invalidate_maintenance_cache()
 
     await callback.message.edit_text(
         "<b>Maintenance mode ENABLED</b>\n\n"
@@ -465,6 +468,7 @@ async def on_maint_end_input(message: types.Message, state: FSMContext) -> None:
     await config_repo.set_config(pool, "MAINTENANCE_MODE", "true")
     await config_repo.set_config(pool, "MAINTENANCE_START", start_iso)
     await config_repo.set_config(pool, "MAINTENANCE_END", end_iso)
+    invalidate_maintenance_cache()
     await state.clear()
 
     start_display = dt.fromisoformat(start_iso).strftime("%Y-%m-%d %H:%M WIB")

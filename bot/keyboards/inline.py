@@ -322,8 +322,6 @@ _CONFIG_LABELS: dict[str, str] = {
     "SHRINKME_ENABLED": "ShrinkMe Shortener",
     "REDIRECT_BASE_URL": "Redirect Base URL",
     "MAINTENANCE_MODE": "Maintenance Mode",
-    "MAINTENANCE_START": "Maintenance Start",
-    "MAINTENANCE_END": "Maintenance End",
     "BUNNY_STORAGE_API_KEY": "Bunny Storage Key",
     "BUNNY_STORAGE_ZONE": "Bunny Storage Zone",
     "BUNNY_STORAGE_REGION": "Bunny Storage Region",
@@ -331,6 +329,9 @@ _CONFIG_LABELS: dict[str, str] = {
 
 # Keys that should render as ON/OFF toggle buttons instead of text editor
 _TOGGLE_KEYS: set[str] = {"SHRINKME_ENABLED", "MAINTENANCE_MODE"}
+
+# Keys managed by wizards — hidden from the settings list
+_HIDDEN_KEYS: set[str] = {"MAINTENANCE_START", "MAINTENANCE_END"}
 
 
 def admin_settings_menu(config_rows: list | None = None) -> InlineKeyboardMarkup:
@@ -344,6 +345,8 @@ def admin_settings_menu(config_rows: list | None = None) -> InlineKeyboardMarkup
         buttons = []
         for cfg in config_rows:
             key = cfg["key"]
+            if key in _HIDDEN_KEYS:
+                continue
             label = _CONFIG_LABELS.get(key, key.replace("_", " ").title())
             if key in _TOGGLE_KEYS:
                 is_on = (cfg["value"] or "").strip().lower() in ("true", "1", "yes")

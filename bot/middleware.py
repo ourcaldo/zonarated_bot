@@ -31,6 +31,14 @@ _cache: dict[str, Any] = {"ts": 0, "enabled": False, "start": None, "end": None}
 _CACHE_TTL = 30  # seconds
 
 
+def invalidate_maintenance_cache() -> None:
+    """Force the next middleware call to re-read the DB.
+
+    Call this from admin handlers right after changing maintenance config.
+    """
+    _cache["ts"] = 0
+
+
 async def _refresh_cache() -> None:
     now = _time.monotonic()
     if now - _cache["ts"] < _CACHE_TTL:
