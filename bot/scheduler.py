@@ -122,6 +122,10 @@ async def _process_scheduled_videos(bot: Bot) -> None:
             thumbnail_b64 = item.get("thumbnail_b64")
             topic_ids_str = item.get("topic_ids") or ""
 
+            # Fall back to global affiliate link from config if not set per-video
+            if not affiliate_link:
+                affiliate_link = await config_repo.get_config(pool, "AFFILIATE_LINK") or ""
+
             is_telegram_file = not file_url.startswith(("http://", "https://"))
 
             # Generate video code and save to DB
