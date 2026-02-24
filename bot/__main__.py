@@ -17,6 +17,7 @@ from bot.db.pool import create_pool, close_pool
 from bot.handlers import register_routers
 from bot.scheduler import start_scheduler
 from bot.web import create_web_app, set_bot
+from bot.middleware import MaintenanceMiddleware
 
 logging.basicConfig(
     level=logging.INFO,
@@ -51,6 +52,10 @@ async def main() -> None:
 
     # Register all routers
     register_routers(dp)
+
+    # Register maintenance middleware (outer, runs before handlers)
+    dp.message.outer_middleware(MaintenanceMiddleware())
+    dp.callback_query.outer_middleware(MaintenanceMiddleware())
 
     # Share bot instance with web server
     set_bot(bot)

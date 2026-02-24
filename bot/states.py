@@ -14,6 +14,8 @@ class AdminInput(StatesGroup):
     waiting_lookup_id = State()
     waiting_broadcast = State()
     waiting_config_value = State()    # generic config key editor
+    waiting_maintenance_start = State()
+    waiting_maintenance_end = State()
 
 
 class AdminCategory(StatesGroup):
@@ -33,6 +35,14 @@ class AdminVideo(StatesGroup):
     waiting_thumb_ts = State()       # admin types new timestamp
     waiting_affiliate = State()      # optional per-video affiliate
     confirming = State()             # preview + confirm / cancel
+    waiting_schedule_time = State()  # schedule: admin inputs datetime
+
+
+class AdminAutoRun(StatesGroup):
+    """States for the Auto Get & Run flow."""
+
+    waiting_delay = State()
+    confirming = State()
 
 
 class UserOnboarding(StatesGroup):

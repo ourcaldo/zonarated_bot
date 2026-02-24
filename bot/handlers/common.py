@@ -8,7 +8,7 @@ from aiogram.filters import Command
 from bot.db.pool import get_pool
 from bot.db import config_repo, user_repo
 from bot.i18n import t
-from bot.keyboards.inline import fallback_keyboard, start_keyboard
+from bot.keyboards.inline import fallback_keyboard, start_keyboard, admin_quick_panel_keyboard
 
 router = Router(name="common")
 
@@ -155,6 +155,15 @@ async def fallback(message: types.Message) -> None:
     """Catch-all for messages not matched by other handlers."""
     pool = await get_pool()
     user_id = message.from_user.id
+
+    # Admin gets quick panel instead of generic user message
+    admin_ids = await config_repo.get_admin_ids(pool)
+    if user_id in admin_ids:
+        await message.reply(
+            "<b>Admin Panel</b>",
+            reply_markup=admin_quick_panel_keyboard(),
+        )
+        return
 
     user = await user_repo.get_user(pool, user_id)
     if user is None:

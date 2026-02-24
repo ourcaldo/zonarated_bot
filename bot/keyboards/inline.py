@@ -277,9 +277,32 @@ def admin_main_menu() -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(text="Add Video", callback_data="adm_addvideo"),
+                InlineKeyboardButton(text="Schedule Video", callback_data="adm_schedulevideo"),
+            ],
+            [
+                InlineKeyboardButton(text="Auto Get & Run", callback_data="adm_autorun"),
+                InlineKeyboardButton(text="Scheduled Queue", callback_data="adm_sched_queue"),
+            ],
+            [
                 InlineKeyboardButton(text="Broadcast", callback_data="adm_broadcast"),
             ],
             [InlineKeyboardButton(text="Close Panel", callback_data="adm_close")],
+        ]
+    )
+
+
+def admin_quick_panel_keyboard() -> InlineKeyboardMarkup:
+    """Quick panel shown when admin sends a generic message."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Open Panel", callback_data="adm_main")],
+            [
+                InlineKeyboardButton(text="Add Video", callback_data="adm_addvideo"),
+                InlineKeyboardButton(text="Schedule Video", callback_data="adm_schedulevideo"),
+            ],
+            [
+                InlineKeyboardButton(text="Auto Get & Run", callback_data="adm_autorun"),
+            ],
         ]
     )
 
@@ -298,10 +321,16 @@ _CONFIG_LABELS: dict[str, str] = {
     "SHRINKME_API_KEY": "ShrinkMe API Key",
     "SHRINKME_ENABLED": "ShrinkMe Shortener",
     "REDIRECT_BASE_URL": "Redirect Base URL",
+    "MAINTENANCE_MODE": "Maintenance Mode",
+    "MAINTENANCE_START": "Maintenance Start",
+    "MAINTENANCE_END": "Maintenance End",
+    "BUNNY_STORAGE_API_KEY": "Bunny Storage Key",
+    "BUNNY_STORAGE_ZONE": "Bunny Storage Zone",
+    "BUNNY_STORAGE_REGION": "Bunny Storage Region",
 }
 
 # Keys that should render as ON/OFF toggle buttons instead of text editor
-_TOGGLE_KEYS: set[str] = {"SHRINKME_ENABLED"}
+_TOGGLE_KEYS: set[str] = {"SHRINKME_ENABLED", "MAINTENANCE_MODE"}
 
 
 def admin_settings_menu(config_rows: list | None = None) -> InlineKeyboardMarkup:
@@ -384,5 +413,127 @@ def admin_cancel() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="Cancel", callback_data="adm_cancel")]
+        ]
+    )
+
+
+# ──────────────────────────────────────────────
+# Maintenance mode
+# ──────────────────────────────────────────────
+
+def maintenance_toggle_keyboard() -> InlineKeyboardMarkup:
+    """Options when enabling maintenance mode."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Enable Now", callback_data="maint_now")],
+            [InlineKeyboardButton(text="Set Schedule", callback_data="maint_schedule")],
+            [InlineKeyboardButton(text="Cancel", callback_data="adm_cancel")],
+        ]
+    )
+
+
+# ──────────────────────────────────────────────
+# Duplicate video check
+# ──────────────────────────────────────────────
+
+def duplicate_video_keyboard() -> InlineKeyboardMarkup:
+    """Shown when a duplicate video URL is detected in the wizard."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Change Video", callback_data="vid_dup_change")],
+            [InlineKeyboardButton(text="Continue Anyway", callback_data="vid_dup_continue")],
+            [InlineKeyboardButton(text="Cancel", callback_data="vid_cancel")],
+        ]
+    )
+
+
+# ──────────────────────────────────────────────
+# Video scheduling
+# ──────────────────────────────────────────────
+
+def video_confirm_or_schedule_keyboard() -> InlineKeyboardMarkup:
+    """Confirm to post now, schedule, or cancel."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="Confirm & Post", callback_data="vid_confirm"),
+                InlineKeyboardButton(text="Schedule", callback_data="vid_schedule"),
+            ],
+            [InlineKeyboardButton(text="Cancel", callback_data="vid_cancel")],
+        ]
+    )
+
+
+def schedule_queue_keyboard(items: list) -> InlineKeyboardMarkup:
+    """Display scheduled items with cancel option."""
+    rows = []
+    for item in items:
+        sid = item["schedule_id"]
+        title = item["title"][:30]
+        status = item["status"]
+        sched_at = item["scheduled_at"].strftime("%m-%d %H:%M")
+        label = f"[{status}] {title} @ {sched_at}"
+        if status == "pending":
+            rows.append([
+                InlineKeyboardButton(text=label, callback_data=f"sched_info_{sid}"),
+                InlineKeyboardButton(text="X", callback_data=f"sched_cancel_{sid}"),
+            ])
+        else:
+            rows.append([InlineKeyboardButton(text=label, callback_data=f"sched_info_{sid}")])
+    rows.append([InlineKeyboardButton(text="< Back", callback_data="adm_main")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+# ──────────────────────────────────────────────
+# Auto Get & Run
+# ──────────────────────────────────────────────
+
+def autorun_category_keyboard(categories: list, selected_ids: list | None = None) -> InlineKeyboardMarkup:
+    """Category picker for Auto Get & Run (multi-select)."""
+    selected_ids = selected_ids or []
+    rows = []
+    for g in categories:
+        if not g["is_all"]:
+            is_sel = g["topic_id"] in selected_ids
+            label = f">> {g['name']}" if is_sel else g["name"]
+            rows.append(
+                [InlineKeyboardButton(text=label, callback_data=f"ar_cat_{g['topic_id']}")]
+            )
+    # All categories button
+    rows.append([InlineKeyboardButton(text="Select All", callback_data="ar_cat_all")])
+    bottom = []
+    if selected_ids:
+        bottom.append(InlineKeyboardButton(text="Next", callback_data="ar_cat_done"))
+    bottom.append(InlineKeyboardButton(text="Cancel", callback_data="adm_cancel"))
+    rows.append(bottom)
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def autorun_delay_keyboard() -> InlineKeyboardMarkup:
+    """Preset delay options for Auto Get & Run."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="15 min", callback_data="ar_delay_15"),
+                InlineKeyboardButton(text="30 min", callback_data="ar_delay_30"),
+            ],
+            [
+                InlineKeyboardButton(text="1 hour", callback_data="ar_delay_60"),
+                InlineKeyboardButton(text="2 hours", callback_data="ar_delay_120"),
+            ],
+            [InlineKeyboardButton(text="Custom (type minutes)", callback_data="ar_delay_custom")],
+            [InlineKeyboardButton(text="Cancel", callback_data="adm_cancel")],
+        ]
+    )
+
+
+def autorun_confirm_keyboard() -> InlineKeyboardMarkup:
+    """Confirm or cancel Auto Get & Run."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="Confirm & Schedule", callback_data="ar_confirm"),
+                InlineKeyboardButton(text="Cancel", callback_data="adm_cancel"),
+            ]
         ]
     )

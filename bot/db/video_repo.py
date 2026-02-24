@@ -86,6 +86,19 @@ async def get_video(pool: asyncpg.Pool, video_id: int) -> Optional[asyncpg.Recor
     )
 
 
+async def get_video_by_url(pool: asyncpg.Pool, file_url: str) -> Optional[asyncpg.Record]:
+    """Fetch a video by its file_url (exact match). Used for duplicate detection."""
+    return await pool.fetchrow(
+        "SELECT * FROM videos WHERE file_url = $1 LIMIT 1", file_url
+    )
+
+
+async def get_all_file_urls(pool: asyncpg.Pool) -> set[str]:
+    """Return all file_url values as a set. Used for bulk duplicate checks."""
+    rows = await pool.fetch("SELECT file_url FROM videos")
+    return {r["file_url"] for r in rows}
+
+
 async def get_video_by_code(pool: asyncpg.Pool, code: str) -> Optional[asyncpg.Record]:
     """Fetch a single video by its unique code (case-insensitive)."""
     return await pool.fetchrow(

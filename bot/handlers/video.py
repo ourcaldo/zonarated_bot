@@ -27,11 +27,13 @@ from bot.keyboards.inline import (
     category_picker_keyboard,
     video_skip_keyboard,
     video_confirm_keyboard,
+    video_confirm_or_schedule_keyboard,
     download_button,
     video_download_button,
     admin_back_main,
     admin_cancel,
     thumbnail_preview_keyboard,
+    duplicate_video_keyboard,
 )
 from bot.states import AdminVideo
 from bot.i18n import t
@@ -82,6 +84,23 @@ async def cb_addvideo(callback: types.CallbackQuery, state: FSMContext) -> None:
 
     await callback.message.edit_text(
         "<b>Add Video</b>\n\n"
+        "Kirim judul video:",
+        reply_markup=admin_cancel(),
+    )
+    await state.set_state(AdminVideo.waiting_title)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "adm_schedulevideo")
+async def cb_schedulevideo(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Schedule Video uses the same wizard — admin picks schedule time at the end."""
+    if not await _is_admin(callback.from_user.id):
+        await callback.answer("Access denied", show_alert=True)
+        return
+
+    await callback.message.edit_text(
+        "<b>Schedule Video</b>\n\n"
+        "Same wizard as Add Video. You will choose the schedule time at the end.\n\n"
         "Kirim judul video:",
         reply_markup=admin_cancel(),
     )
@@ -287,6 +306,34 @@ async def on_video_file(message: types.Message, state: FSMContext) -> None:
 
     await state.update_data(file_url=file_url, is_telegram_file=is_telegram_file)
 
+    # ── Duplicate check ──────────────────────────
+    pool = await get_pool()
+    existing = await video_repo.get_video_by_url(pool, file_url)
+    if existing:
+        post_date = existing["post_date"].strftime("%Y-%m-%d %H:%M") if existing["post_date"] else "N/A"
+        await message.answer(
+            "<b>Duplicate Detected</b>\n\n"
+            f"This video has been posted before:\n\n"
+            f"Title: <b>{existing['title']}</b>\n"
+            f"Code: <code>{existing['code']}</code>\n"
+            f"Category: {existing['category'] or 'N/A'}\n"
+            f"Posted: {post_date}\n\n"
+            "Choose an action:",
+            reply_markup=duplicate_video_keyboard(),
+        )
+        return
+
+    # Proceed to next step
+    await _proceed_after_file(message, state, file_url, is_telegram_file)
+
+
+async def _proceed_after_file(
+    message: types.Message,
+    state: FSMContext,
+    file_url: str,
+    is_telegram_file: bool,
+) -> None:
+    """Continue the wizard after file input (and after duplicate resolution)."""
     # For Telegram file uploads, skip thumbnail step (already has preview)
     if is_telegram_file:
         await state.set_state(AdminVideo.waiting_affiliate)
@@ -327,6 +374,30 @@ async def on_video_file(message: types.Message, state: FSMContext) -> None:
             "Atau klik Skip untuk menggunakan affiliate link global.",
             reply_markup=video_skip_keyboard(),
         )
+
+
+# ── Duplicate resolution callbacks ────────────
+
+@router.callback_query(AdminVideo.waiting_file, F.data == "vid_dup_change")
+async def cb_vid_dup_change(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Go back to file input step."""
+    await state.update_data(file_url=None, is_telegram_file=False)
+    await callback.message.edit_text(
+        "<b>Step 4/6: Video File</b>\n\n"
+        "Kirim file video atau URL video:",
+        reply_markup=admin_cancel(),
+    )
+    await callback.answer()
+
+
+@router.callback_query(AdminVideo.waiting_file, F.data == "vid_dup_continue")
+async def cb_vid_dup_continue(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Continue with the duplicate URL anyway."""
+    data = await state.get_data()
+    file_url = data["file_url"]
+    is_telegram_file = data.get("is_telegram_file", False)
+    await _proceed_after_file(callback.message, state, file_url, is_telegram_file)
+    await callback.answer()
 
 
 # ── Step 5: Thumbnail preview / change / upload ──
@@ -490,14 +561,14 @@ async def _show_video_preview(message: types.Message, state: FSMContext, *, edit
         f"Thumbnail: {has_thumb}\n"
         f"Affiliate: {aff}\n\n"
         "<i>Code akan di-generate otomatis saat posting.</i>\n\n"
-        "Konfirmasi untuk posting?"
+        "Post now or schedule for later?"
     )
 
     await state.set_state(AdminVideo.confirming)
     if edit:
-        await message.edit_text(text, reply_markup=video_confirm_keyboard())
+        await message.edit_text(text, reply_markup=video_confirm_or_schedule_keyboard())
     else:
-        await message.answer(text, reply_markup=video_confirm_keyboard())
+        await message.answer(text, reply_markup=video_confirm_or_schedule_keyboard())
 
 
 # ── Confirm & post ────────────────────────────
@@ -612,6 +683,85 @@ async def on_video_confirm(callback: types.CallbackQuery, state: FSMContext) -> 
         reply_markup=admin_back_main(),
     )
     await callback.answer()
+
+
+# ── Schedule video (from wizard) ──────────────
+
+@router.callback_query(AdminVideo.confirming, F.data == "vid_schedule")
+async def on_video_schedule(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Admin chose to schedule instead of posting immediately."""
+    if not await _is_admin(callback.from_user.id):
+        await callback.answer("Access denied", show_alert=True)
+        return
+
+    await state.set_state(AdminVideo.waiting_schedule_time)
+    await callback.message.edit_text(
+        "<b>Schedule Video</b>\n\n"
+        "Send the datetime to post (format: YYYY-MM-DD HH:MM)\n"
+        "Timezone: UTC+7 (WIB)\n\n"
+        "Example: 2026-02-25 14:00",
+        reply_markup=admin_cancel(),
+    )
+    await callback.answer()
+
+
+@router.message(AdminVideo.waiting_schedule_time)
+async def on_video_schedule_time(message: types.Message, state: FSMContext) -> None:
+    """Admin sends the schedule datetime."""
+    if not await _is_admin(message.from_user.id):
+        return
+
+    from datetime import datetime as dt, timezone as tz, timedelta
+    from bot.db import schedule_repo
+
+    text = (message.text or "").strip()
+    try:
+        naive = dt.strptime(text, "%Y-%m-%d %H:%M")
+        wib = tz(timedelta(hours=7))
+        sched_dt = naive.replace(tzinfo=wib)
+    except ValueError:
+        await message.reply("Format salah. Gunakan: YYYY-MM-DD HH:MM\nContoh: 2026-02-25 14:00")
+        return
+
+    data = await state.get_data()
+    await state.clear()
+
+    title = data["title"]
+    genres_data = data.get("categories", [])
+    genre_names = data.get("category_names", [])
+    genre_display = ", ".join(genre_names) if genre_names else "-"
+    description = data.get("description")
+    file_url = data["file_url"]
+    affiliate_link = data.get("affiliate_link")
+    thumbnail_b64 = data.get("thumbnail_b64")
+
+    # Build topic_ids comma-separated
+    topic_ids_str = ",".join(str(g["topic_id"]) for g in genres_data)
+
+    pool = await get_pool()
+    sched = await schedule_repo.create_scheduled_video(
+        pool,
+        title=title,
+        category=genre_display,
+        description=description,
+        file_url=file_url,
+        thumbnail_b64=thumbnail_b64,
+        thumbnail_file_id=None,
+        affiliate_link=affiliate_link,
+        topic_ids=topic_ids_str,
+        scheduled_at=sched_dt,
+        created_by=message.from_user.id,
+    )
+
+    display_time = sched_dt.strftime("%Y-%m-%d %H:%M WIB")
+    await message.answer(
+        f"<b>Video Scheduled</b>\n\n"
+        f"Title: <b>{title}</b>\n"
+        f"Category: {genre_display}\n"
+        f"Scheduled for: {display_time}\n"
+        f"Schedule ID: {sched['schedule_id']}",
+        reply_markup=admin_back_main(),
+    )
 
 
 async def _post_to_topic(

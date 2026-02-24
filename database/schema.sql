@@ -29,7 +29,13 @@ INSERT INTO config (key, value, description) VALUES
     ('WELCOME_MESSAGE',       'Selamat datang di ZONA RATED!', 'Welcome message sent when user starts the bot'),
     ('SHRINKME_API_KEY',      '',                                'ShrinkMe.io API key for URL shortening (leave empty to disable)'),
     ('SHRINKME_ENABLED',      'true',                            'Enable/disable ShrinkMe URL shortening (true/false)'),
-    ('REDIRECT_BASE_URL',     '',                                'Base URL for verified redirect links (ngrok/custom domain)')
+    ('REDIRECT_BASE_URL',     '',                                'Base URL for verified redirect links (ngrok/custom domain)'),
+    ('MAINTENANCE_MODE',      'false',                           'Enable/disable bot maintenance mode (true/false)'),
+    ('MAINTENANCE_START',     '',                                'Maintenance window start (ISO 8601 datetime, optional)'),
+    ('MAINTENANCE_END',       '',                                'Maintenance window end (ISO 8601 datetime, optional)'),
+    ('BUNNY_STORAGE_API_KEY', '',                                'Bunny Edge Storage API key for Auto Get & Run'),
+    ('BUNNY_STORAGE_ZONE',    '',                                'Bunny Edge Storage zone name (e.g. zrbot)'),
+    ('BUNNY_STORAGE_REGION',  '',                                'Bunny Edge Storage region (e.g. sg for Singapore, empty for default)')
 ON CONFLICT (key) DO NOTHING;
 
 
@@ -199,3 +205,31 @@ CREATE TABLE IF NOT EXISTS invite_links (
 
 CREATE INDEX IF NOT EXISTS idx_il_user    ON invite_links(user_id);
 CREATE INDEX IF NOT EXISTS idx_il_expires ON invite_links(expires_at);
+
+
+-- ===========================================
+-- 9. SCHEDULED VIDEOS TABLE
+-- Queued videos for scheduled posting and
+-- Auto Get & Run batch scheduling
+-- ===========================================
+CREATE TABLE IF NOT EXISTS scheduled_videos (
+    schedule_id      BIGSERIAL    PRIMARY KEY,
+    title            VARCHAR(255) NOT NULL,
+    category         VARCHAR(100),
+    description      TEXT,
+    file_url         TEXT         NOT NULL,
+    thumbnail_b64    TEXT,                                        -- Base64-encoded thumbnail bytes (nullable)
+    thumbnail_file_id TEXT,                                       -- Telegram file_id for thumbnail (nullable)
+    affiliate_link   TEXT,                                        -- Per-video affiliate override (nullable)
+    topic_ids        TEXT,                                        -- Comma-separated topic IDs to post to
+    scheduled_at     TIMESTAMPTZ  NOT NULL,                       -- When to post
+    status           VARCHAR(20)  DEFAULT 'pending',              -- pending | posting | posted | failed | cancelled
+    created_by       BIGINT       NOT NULL,                       -- Admin user_id who created this
+    created_at       TIMESTAMPTZ  DEFAULT NOW(),
+    posted_at        TIMESTAMPTZ,                                 -- Actual post timestamp (set on success)
+    error_message    TEXT                                         -- Error details (set on failure)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sv_status    ON scheduled_videos(status);
+CREATE INDEX IF NOT EXISTS idx_sv_scheduled ON scheduled_videos(scheduled_at);
+CREATE INDEX IF NOT EXISTS idx_sv_file_url  ON scheduled_videos(file_url);
